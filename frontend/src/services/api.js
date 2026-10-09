@@ -1,14 +1,18 @@
 import axios from 'axios';
 
 const getBaseURL = () => {
-    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+    const rawTarget = import.meta.env.VITE_BACKEND_TARGET || 
+                      import.meta.env.VITE_BACKEND_URL || 
+                      import.meta.env.VITE_API_URL;
+    if (rawTarget && rawTarget.trim()) {
+        const cleanTarget = rawTarget.trim().replace(/\/+$/, '');
+        return cleanTarget.endsWith('/api') ? cleanTarget : `${cleanTarget}/api`;
+    }
     if (typeof window !== 'undefined' && window.location) {
-        // In production container, behind reverse proxy, or HTTPS, use origin
-        if (window.location.port === '80' || window.location.port === '' || window.location.protocol === 'https:') {
-            return `${window.location.origin}/api`;
+        if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+            return 'https://smart-tn-backend.onrender.com/api';
         }
-        const host = window.location.hostname || 'localhost';
-        return `http://${host}:5000/api`;
+        return `http://${window.location.hostname}:5000/api`;
     }
     return 'http://localhost:5000/api';
 };

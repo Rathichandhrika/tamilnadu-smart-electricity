@@ -10,11 +10,11 @@ const { sendPasswordResetEmail, getLastSentEmail } = require('../services/emailS
 // Google OAuth Client
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// HttpOnly Cookie Configuration adhering to strict security policies
+// HttpOnly Cookie Configuration adhering to cross-origin deployment (Vercel -> Render)
 const getCookieOptions = () => ({
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds
 });
 
