@@ -3,8 +3,12 @@ import os
 import io
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-from gtts import gTTS
 import joblib
+
+try:
+    from gtts import gTTS
+except ImportError:
+    gTTS = None
 
 if sys.stdout.encoding != 'utf-8':
     try:
@@ -390,9 +394,14 @@ def energy_inbox():
         return jsonify({"success": False, "message": str(e)}), 400
 
 import asyncio
-import edge_tts
+try:
+    import edge_tts
+except ImportError:
+    edge_tts = None
 
 async def generate_edge_tts(text, voice):
+    if not edge_tts:
+        raise ImportError("edge-tts is not installed")
     communicate = edge_tts.Communicate(text, voice)
     data = b""
     async for chunk in communicate.stream():
@@ -424,19 +433,24 @@ def text_to_speech():
         is_tamil = lang in ['ta', 'ta-IN', 'tamil']
         voice = 'ta-IN-PallaviNeural' if is_tamil else 'en-IN-NeerjaNeural'
 
-        try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            audio_bytes = loop.run_until_complete(generate_edge_tts(clean_text, voice))
-            loop.close()
-            return send_file(io.BytesIO(audio_bytes), mimetype='audio/mp3', as_attachment=False)
-        except Exception as edge_err:
-            print(f"[WARN] edge_tts failed, falling back to gTTS: {edge_err}")
+        if edge_tts:
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                audio_bytes = loop.run_until_complete(generate_edge_tts(clean_text, voice))
+                loop.close()
+                return send_file(io.BytesIO(audio_bytes), mimetype='audio/mp3', as_attachment=False)
+            except Exception as edge_err:
+                print(f"[WARN] edge_tts failed, falling back to gTTS: {edge_err}")
+
+        if gTTS:
             tts = gTTS(text=clean_text, lang='ta' if is_tamil else 'en', slow=False)
             fp = io.BytesIO()
             tts.write_to_fp(fp)
             fp.seek(0)
             return send_file(fp, mimetype='audio/mp3', as_attachment=False)
+
+        return jsonify({"success": False, "message": "No TTS engine available"}), 503
 
     except Exception as e:
         print(f"[ERROR] TTS Generation failed: {e}")
