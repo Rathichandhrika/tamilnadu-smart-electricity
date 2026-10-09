@@ -18,18 +18,20 @@ export default function Layout({ children }) {
             
             {/* 1. Mobile Top Bar (Hamburger + Brand + Lang) */}
             <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-dark border-b border-panelBorder z-40 flex items-center justify-between px-4 shadow-lg">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                     <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-gold-400 to-amber-600 flex items-center justify-center shadow">
                         <Zap className="text-darker fill-darker" size={16} />
                     </div>
-                    <span className="font-extrabold text-white tracking-wide text-sm">{t('app.name')}</span>
+                    <span className="font-extrabold text-white tracking-wide text-sm whitespace-nowrap">{t('app.name')}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                     <button
                         onClick={toggleLanguage}
-                        className="px-2.5 py-1 rounded-lg bg-darker border border-panelBorder text-gold-400 text-xs font-mono font-bold hover:border-gold-500/40 transition cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-darker border border-panelBorder text-gold-400 text-xs font-mono font-bold hover:border-gold-500/40 transition cursor-pointer"
+                        title={language === 'en' ? 'Switch to Tamil' : 'Switch to English'}
                     >
-                        {language === 'en' ? '🇮🇳 தமிழ்' : '🇬🇧 EN'}
+                        <Globe size={13} className="text-gold-400" />
+                        <span>{language === 'en' ? 'தமிழ்' : 'EN'}</span>
                     </button>
                     <button 
                         onClick={() => setIsMobileMenuOpen(true)} 

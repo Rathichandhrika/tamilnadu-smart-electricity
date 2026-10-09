@@ -202,7 +202,7 @@ export default function Dashboard() {
                     </p>
                 </div>
 
-                <div className="flex items-center gap-2 sm:gap-2.5 flex-nowrap overflow-x-auto pb-1 xl:pb-0 shrink-0">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 pt-2 xl:pt-0 shrink-0">
                     {/* Connection Type Badge */}
                     <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shrink-0 whitespace-nowrap ${connectionType === 'LT-V_COMMERCIAL'
                         ? 'bg-purple-500/10 text-purple-400 border border-purple-500/30'

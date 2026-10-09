@@ -736,7 +736,7 @@ export default function ApplianceProfiler() {
                     <button
                         onClick={fetchAiAdvice}
                         disabled={analyzing || appliances.length === 0}
-                        className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-gold-500 to-amber-600 hover:from-gold-400 hover:to-amber-500 text-darker font-extrabold text-xs uppercase tracking-wider transition shadow-lg disabled:opacity-50 cursor-pointer"
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 sm:py-2.5 rounded-xl bg-gradient-to-r from-gold-500 to-amber-600 hover:from-gold-400 hover:to-amber-500 text-darker font-extrabold text-xs uppercase tracking-wider transition shadow-lg disabled:opacity-50 cursor-pointer"
                     >
                         {analyzing ? (
                             <>

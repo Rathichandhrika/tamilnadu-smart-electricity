@@ -493,7 +493,7 @@ export default function Insights() {
 
             {/* TAB 3: APPLIANCE PROFILER */}
             {activeTab === 'profiler' && (
-                <div className="space-y-6">
+                <div className="space-y-6 pb-14 sm:pb-6">
                     <ApplianceProfiler />
                 </div>
             )}

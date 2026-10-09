@@ -382,14 +382,14 @@ export default function AuthPage() {
                     <header className="border-b border-panelBorder/70 bg-darker/80 backdrop-blur-md sticky top-0 z-30">
                         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
                             {/* Brand Logo */}
-                            <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
-                                <div className="w-9 h-9 sm:w-11 sm:h-11 bg-gold-500/10 rounded-xl flex items-center justify-center border border-gold-500/30 shadow-lg shadow-gold-500/5 shrink-0">
-                                    <Zap className="text-gold-500" size={18} />
+                            <div className="flex items-center gap-2 sm:gap-3.5 shrink-0">
+                                <div className="w-8 h-8 sm:w-11 sm:h-11 bg-gold-500/10 rounded-xl flex items-center justify-center border border-gold-500/30 shadow-lg shadow-gold-500/5 shrink-0">
+                                    <Zap className="text-gold-500" size={17} />
                                 </div>
-                                <div className="min-w-0">
+                                <div className="shrink-0">
                                     <div className="flex items-center gap-1.5 sm:gap-2">
-                                        <h1 className="text-xs sm:text-lg lg:text-xl font-extrabold text-white tracking-wide sm:tracking-wider uppercase truncate">
-                                            Smart TN <span className="text-gold-500">{language === 'ta' ? 'மின்சாரம்' : 'Electricity'}</span>
+                                        <h1 className="text-sm sm:text-lg lg:text-xl font-extrabold text-white tracking-wide sm:tracking-wider uppercase whitespace-nowrap">
+                                            Smart TN <span className="text-gold-500 hidden sm:inline">{language === 'ta' ? 'மின்சாரம்' : 'Electricity'}</span>
                                         </h1>
                                         <span className="hidden md:inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
                                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -412,7 +412,7 @@ export default function AuthPage() {
                                     title={language === 'en' ? 'தமிழில் மாற்றவும்' : 'Switch to English'}
                                 >
                                     <Globe size={13} className="text-gold-400 group-hover:rotate-45 transition-transform duration-300 shrink-0" />
-                                    <span className="tracking-wide hidden sm:inline">{language === 'en' ? 'தமிழ்' : 'English'}</span>
+                                    <span className="tracking-wide hidden md:inline">{language === 'en' ? 'தமிழ்' : 'English'}</span>
                                     <span className="text-[9px] uppercase font-mono font-bold px-1.5 py-0.5 rounded bg-dark border border-panelBorder text-gold-400">
                                         {language.toUpperCase()}
                                     </span>
@@ -422,19 +422,19 @@ export default function AuthPage() {
                                 <button
                                     type="button"
                                     onClick={() => { setActiveTab('login'); setError(''); setSuccessMessage(''); }}
-                                    className="px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-panel hover:bg-dark border border-panelBorder hover:border-gold-500/50 text-slate-200 hover:text-gold-400 font-bold text-xs sm:text-sm uppercase tracking-wider transition cursor-pointer shadow-md shrink-0"
+                                    className="px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-panel hover:bg-dark border border-panelBorder hover:border-gold-500/50 text-slate-200 hover:text-gold-400 font-bold text-xs sm:text-sm uppercase tracking-wider transition cursor-pointer shadow-md shrink-0 whitespace-nowrap"
                                 >
                                     {t('auth.login', 'Sign In')}
                                 </button>
 
-                                {/* Register CTA */}
+                                {/* Register CTA (Shown on tablet/desktop, mobile has hero CTA) */}
                                 <button
                                     type="button"
                                     onClick={() => { setActiveTab('register'); setError(''); setSuccessMessage(''); }}
-                                    className="px-3 sm:px-5 py-1.5 sm:py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-darker font-extrabold text-xs sm:text-sm uppercase tracking-wider transition shadow-lg shadow-gold-500/10 cursor-pointer flex items-center gap-1 sm:gap-1.5 shrink-0 whitespace-nowrap"
+                                    className="hidden sm:inline-flex px-3 sm:px-5 py-1.5 sm:py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-darker font-extrabold text-xs sm:text-sm uppercase tracking-wider transition shadow-lg shadow-gold-500/10 cursor-pointer items-center gap-1 sm:gap-1.5 shrink-0 whitespace-nowrap"
                                 >
                                     <span>{t('auth.register', 'Register')}</span>
-                                    <ArrowRight size={13} className="hidden sm:inline" />
+                                    <ArrowRight size={13} />
                                 </button>
                             </div>
                         </div>
