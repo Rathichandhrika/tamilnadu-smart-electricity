@@ -1,3 +1,9 @@
+// Polyfill global crypto for older Node.js runtimes (Render / Mongoose 9)
+const crypto = require('crypto');
+if (!globalThis.crypto) {
+    globalThis.crypto = crypto;
+}
+
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
@@ -5,10 +11,12 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 const path = require('path');
-const connectDB = require('./config/db');
 
-// Environment & Database
+// Environment config (supports local root .env or backend .env or Render cloud envs)
 dotenv.config({ path: path.join(__dirname, '../../.env') });
+dotenv.config();
+
+const connectDB = require('./config/db');
 connectDB();
 
 // Rate Limiters
