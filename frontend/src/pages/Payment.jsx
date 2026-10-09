@@ -125,7 +125,7 @@ export default function Payment() {
             {/* Header */}
             <div className="border-b border-panelBorder pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
                         <CreditCard className="text-gold-500" size={30} />
                         <span>
                             {language === 'ta' ? 'மின்கட்டணம் ' : 'TANGEDCO '}

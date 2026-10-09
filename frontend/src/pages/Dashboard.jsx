@@ -193,7 +193,7 @@ export default function Dashboard() {
             {/* Header Banner */}
             <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-panelBorder pb-6">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
                         <LayoutDashboard className="text-gold-500" size={30} />
                         <span>{t('dashboard.title', 'Consumer Dashboard')}</span>
                     </h1>
