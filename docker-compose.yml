@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # 1. MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: smart_tn_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - smart_tn_net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. Python Flask AI/ML & IoT Microservice
+  ai-ml:
+    build:
+      context: ./ai-ml
+      dockerfile: Dockerfile
+    container_name: smart_tn_aiml
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      - PORT=5001
+      - FLASK_ENV=production
+    networks:
+      - smart_tn_net
+
+  # 3. Node.js Backend & Real-Time Socket.io Server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smart_tn_backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGO_URI=mongodb://mongodb:27017/smart_tn_electricity
+      - JWT_SECRET=smart_tn_production_secret_key_jwt_token_2026
+      - ML_SERVICE_URL=http://ai-ml:5001
+      - FRONTEND_URL=http://localhost
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      ai-ml:
+        condition: service_started
+    networks:
+      - smart_tn_net
+
+  # 4. React Frontend (Nginx SPA + Reverse Proxy)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: smart_tn_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - smart_tn_net
+
+volumes:
+  mongo_data:
+    driver: local
+
+networks:
+  smart_tn_net:
+    driver: bridge

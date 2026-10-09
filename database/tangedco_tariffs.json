@@ -1,0 +1,81 @@
+{
+  "version": "TNERC-TANGEDCO-2026-v2",
+  "effectiveDate": "2026-07-01T00:00:00.000Z",
+  "regulatoryAuthority": "Tamil Nadu Electricity Regulatory Commission (TNERC)",
+  "tariffs": {
+    "LT-1A_DOMESTIC": {
+      "category": "LT-1A",
+      "name": "Domestic Residential Supply",
+      "nameTa": "வீட்டு இணைப்பு மின்வழங்கல்",
+      "billingCycle": "Bi-Monthly (60 Days)",
+      "billingModel": "Telescopic Subsidized",
+      "fixedChargePerKw": 0,
+      "electricityTaxPercent": 0,
+      "freeUnitsSubsidy": 200,
+      "cutoffThreshold": 500,
+      "tiers": [
+        {
+          "tierName": "Tier 1: Up to 500 Units (Subsidized)",
+          "tierNameTa": "அடுக்கு 1: 500 யூனிட்கள் வரை (மானிய அடுக்கு)",
+          "maxUnits": 500,
+          "freeUnits": 200,
+          "slabs": [
+            { "minUnits": 0, "maxUnits": 200, "rate": 0.00, "label": "0 - 200 Units (Free Subsidy)" },
+            { "minUnits": 201, "maxUnits": 400, "rate": 4.50, "label": "201 - 400 Units" },
+            { "minUnits": 401, "maxUnits": 500, "rate": 6.00, "label": "401 - 500 Units" }
+          ]
+        },
+        {
+          "tierName": "Tier 2: Above 500 Units (Subsidy Revoked)",
+          "tierNameTa": "அடுக்கு 2: 500 யூனிட்களுக்கு மேல் (மானியம் ரத்து)",
+          "maxUnits": 99999,
+          "freeUnits": 0,
+          "slabs": [
+            { "minUnits": 0, "maxUnits": 100, "rate": 0.00, "label": "0 - 100 Units (Base)" },
+            { "minUnits": 101, "maxUnits": 400, "rate": 4.50, "label": "101 - 400 Units" },
+            { "minUnits": 401, "maxUnits": 500, "rate": 6.00, "label": "401 - 500 Units" },
+            { "minUnits": 501, "maxUnits": 600, "rate": 8.00, "label": "501 - 600 Units" },
+            { "minUnits": 601, "maxUnits": 800, "rate": 9.00, "label": "601 - 800 Units" },
+            { "minUnits": 801, "maxUnits": 1000, "rate": 10.00, "label": "801 - 1000 Units" },
+            { "minUnits": 1001, "maxUnits": 99999, "rate": 11.00, "label": "Above 1000 Units" }
+          ]
+        }
+      ]
+    },
+    "LT-V_COMMERCIAL": {
+      "category": "LT-V",
+      "name": "Commercial & Professional Establishments",
+      "nameTa": "வணிக & தொழில்முறை நிறுவனங்கள்",
+      "billingCycle": "Bi-Monthly (60 Days)",
+      "billingModel": "Non-Telescopic Punitive",
+      "fixedChargePerKw": 110.00,
+      "electricityTaxPercent": 5.0,
+      "thresholdUnits": 100,
+      "rates": {
+        "lowUsageRate": 6.65,
+        "highUsageRate": 10.45
+      },
+      "slabs": [
+        { "condition": "<= 100 Units", "rate": 6.65, "label": "Low Usage Bracket (<= 100 units @ ₹6.65/unit)" },
+        { "condition": "> 100 Units", "rate": 10.45, "label": "High Usage Bracket (> 100 units flat @ ₹10.45/unit across ALL units)" }
+      ]
+    },
+    "LT-IIIB_INDUSTRIAL": {
+      "category": "LT-IIIB",
+      "name": "Low Tension Industrial & Manufacturing Supply",
+      "nameTa": "குறைந்த மின்னழுத்த தொழிற்துறை & உற்பத்தி மின்வழங்கல்",
+      "billingCycle": "Bi-Monthly (60 Days)",
+      "billingModel": "Flat Industrial Rate + Demand Charges",
+      "flatEnergyRate": 7.65,
+      "fixedDemandChargePerKw": 600.00,
+      "electricityTaxPercent": 5.0,
+      "description": "Standard TANGEDCO LT-IIIB tariff applicable to micro, small, and medium manufacturing units, cottage industries, and fabrication workshops.",
+      "descriptionTa": "குறு, சிறு மற்றும் நடுத்தர உற்பத்தி அலகுகள், குடிசைத் தொழில்கள் மற்றும் பட்டறைகளுக்கான TANGEDCO LT-IIIB அதிகாரப்பூர்வ கட்டணம்.",
+      "slabs": [
+        { "slab": "Industrial Energy Draw", "rate": 7.65, "unit": "kWh", "type": "FLAT" },
+        { "slab": "Bi-Monthly Demand Charge", "rate": 600.00, "unit": "kW", "type": "FIXED_DEMAND" },
+        { "slab": "Tamil Nadu Electricity Duty", "rate": 0.05, "unit": "PERCENT", "type": "TAX" }
+      ]
+    }
+  }
+}

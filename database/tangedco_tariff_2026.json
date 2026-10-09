@@ -1,0 +1,30 @@
+{
+  "category": "LT-1A",
+  "description": "Domestic Supply (Bi-Monthly)",
+  "effectiveDate": "2026-07-01T00:00:00.000Z",
+  "fixedChargePerKw": 0,
+  "tiers": [
+    {
+      "tierName": "Tier 1: Up to 500 Units",
+      "conditionMaxUnits": 500,
+      "freeUnits": 200,
+      "slabs": [
+        { "minUnits": 201, "maxUnits": 400, "ratePerUnit": 4.95 },
+        { "minUnits": 401, "maxUnits": 500, "ratePerUnit": 6.65 }
+      ]
+    },
+    {
+      "tierName": "Tier 2: Above 500 Units",
+      "conditionMaxUnits": 99999,
+      "freeUnits": 100,
+      "slabs": [
+        { "minUnits": 101, "maxUnits": 400, "ratePerUnit": 4.95 },
+        { "minUnits": 401, "maxUnits": 500, "ratePerUnit": 6.65 },
+        { "minUnits": 501, "maxUnits": 600, "ratePerUnit": 8.80 },
+        { "minUnits": 601, "maxUnits": 800, "ratePerUnit": 9.95 },
+        { "minUnits": 801, "maxUnits": 1000, "ratePerUnit": 11.05 },
+        { "minUnits": 1001, "maxUnits": 99999, "ratePerUnit": 12.15 }
+      ]
+    }
+  ]
+}

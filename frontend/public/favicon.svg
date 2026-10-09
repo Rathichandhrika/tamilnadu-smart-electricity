@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <!-- Premium Golden Gradient matching your Tailwind gold-500 palette -->
+    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE68A" />  <!-- gold-300 -->
+      <stop offset="50%" stop-color="#F59E0B" />  <!-- gold-500 -->
+      <stop offset="100%" stop-color="#D97706" /> <!-- gold-600 -->
+    </linearGradient>
+    
+    <!-- Subtle dark glow effect for contrast against light/dark browser tabs -->
+    <filter id="dropShadow" x="-20%" y="-20%" width="250%" height="250%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+  
+  <!-- Sleek Lightning Bolt Path -->
+  <path 
+    d="M38 4L14 36H32L26 60L52 26H34L38 4Z" 
+    fill="url(#goldGradient)" 
+    filter="url(#dropShadow)"
+  />
+</svg>
