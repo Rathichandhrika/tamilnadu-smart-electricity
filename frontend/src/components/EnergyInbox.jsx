@@ -395,54 +395,54 @@ export default function EnergyInbox({
                 </div>
 
                 {/* KPI TELEMETRY STRIP */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 pt-5">
                     {/* Metric 1: Cycle Progress */}
-                    <div className="bg-darker border border-panelBorder/70 p-3 rounded-xl">
-                        <span className="text-[10px] font-mono uppercase text-slate-400 block font-semibold">
+                    <div className="bg-darker border border-panelBorder/70 p-3 rounded-xl min-w-0">
+                        <span className="text-[10px] font-mono uppercase text-slate-400 block font-semibold truncate">
                             {t('energyInbox.billingCycle', 'Billing Cycle')}
                         </span>
-                        <div className="flex items-baseline gap-1 mt-0.5">
-                            <span className="text-lg font-bold font-mono text-white">Day {daysPassed}</span>
-                            <span className="text-[11px] font-mono text-slate-500">/ 60</span>
+                        <div className="flex flex-wrap items-baseline gap-1 mt-0.5">
+                            <span className="text-base sm:text-lg font-bold font-mono text-white">Day {daysPassed}</span>
+                            <span className="text-[10px] sm:text-[11px] font-mono text-slate-500">/ 60</span>
                         </div>
                     </div>
 
                     {/* Metric 2: Current Meter Run */}
-                    <div className="bg-darker border border-panelBorder/70 p-3 rounded-xl">
-                        <span className="text-[10px] font-mono uppercase text-slate-400 block font-semibold">
+                    <div className="bg-darker border border-panelBorder/70 p-3 rounded-xl min-w-0">
+                        <span className="text-[10px] font-mono uppercase text-slate-400 block font-semibold truncate">
                             {t('energyInbox.recordedUnits', 'Recorded Units')}
                         </span>
-                        <div className="flex items-baseline gap-1 mt-0.5">
-                            <span className="text-lg font-bold font-mono text-gold-400">{currentUnits}</span>
-                            <span className="text-[11px] font-mono text-slate-500">kWh</span>
+                        <div className="flex flex-wrap items-baseline gap-1 mt-0.5">
+                            <span className="text-base sm:text-lg font-bold font-mono text-gold-400">{currentUnits}</span>
+                            <span className="text-[10px] sm:text-[11px] font-mono text-slate-500">kWh</span>
                         </div>
                     </div>
 
                     {/* Metric 3: Current Daily Pace */}
-                    <div className="bg-darker border border-panelBorder/70 p-3 rounded-xl">
-                        <span className="text-[10px] font-mono uppercase text-slate-400 block font-semibold">
+                    <div className="bg-darker border border-panelBorder/70 p-3 rounded-xl min-w-0">
+                        <span className="text-[10px] font-mono uppercase text-slate-400 block font-semibold truncate">
                             {t('energyInbox.usageVelocity', 'Usage Velocity')}
                         </span>
-                        <div className="flex items-baseline gap-1 mt-0.5">
-                            <span className={`text-lg font-bold font-mono ${dailyVelocity > 8.33 ? 'text-rose-400' : 'text-emerald-400'
+                        <div className="flex flex-wrap items-baseline gap-1 mt-0.5">
+                            <span className={`text-base sm:text-lg font-bold font-mono ${dailyVelocity > 8.33 ? 'text-rose-400' : 'text-emerald-400'
                                 }`}>
                                 {dailyVelocity}
                             </span>
-                            <span className="text-[11px] font-mono text-slate-500">kWh/day</span>
+                            <span className="text-[10px] sm:text-[11px] font-mono text-slate-500">kWh/day</span>
                         </div>
                     </div>
 
                     {/* Metric 4: Projected Total */}
-                    <div className="bg-darker border border-panelBorder/70 p-3 rounded-xl">
-                        <span className="text-[10px] font-mono uppercase text-slate-400 block font-semibold">
+                    <div className="bg-darker border border-panelBorder/70 p-3 rounded-xl min-w-0">
+                        <span className="text-[10px] font-mono uppercase text-slate-400 block font-semibold truncate">
                             {t('energyInbox.projectedTotal', 'Cycle Projected')}
                         </span>
-                        <div className="flex items-baseline gap-1 mt-0.5">
-                            <span className={`text-lg font-bold font-mono ${projectedCycleUnits > 500 ? 'text-rose-400' : 'text-white'
+                        <div className="flex flex-wrap items-baseline gap-1 mt-0.5">
+                            <span className={`text-base sm:text-lg font-bold font-mono ${projectedCycleUnits > 500 ? 'text-rose-400' : 'text-white'
                                 }`}>
                                 {projectedCycleUnits}
                             </span>
-                            <span className="text-[11px] font-mono text-slate-500">
+                            <span className="text-[10px] sm:text-[11px] font-mono text-slate-500">
                                 {projectedCycleUnits > 500 ? t('energyInbox.projectedOver', '>500 Cutoff') : t('energyInbox.projectedUnder', 'kWh (Under 500)')}
                             </span>
                         </div>
@@ -450,26 +450,26 @@ export default function EnergyInbox({
                 </div>
 
                 {/* Collapsible Simulation / Tuning Drawer Toggle */}
-                <div className="pt-4 mt-4 border-t border-panelBorder/60 flex items-center justify-between">
+                <div className="pt-4 mt-4 border-t border-panelBorder/60 flex flex-wrap items-center justify-between gap-2.5">
                     <button
                         onClick={() => setShowAdjuster(prev => !prev)}
                         className="inline-flex items-center gap-1.5 text-xs font-mono text-gold-400 hover:text-gold-300 font-semibold transition cursor-pointer"
                     >
-                        <Sliders size={13} />
-                        <span>
+                        <Sliders size={13} className="shrink-0" />
+                        <span className="text-left">
                             {showAdjuster
                                 ? t('energyInbox.hideAdjuster', 'Hide Live Parameter Adjuster')
                                 : t('energyInbox.showAdjuster', 'Open Live Parameter Adjuster (Test Anomalies)')}
                         </span>
-                        {showAdjuster ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                        {showAdjuster ? <ChevronUp size={13} className="shrink-0" /> : <ChevronDown size={13} className="shrink-0" />}
                     </button>
 
                     <button
                         onClick={handleResetAll}
-                        className="inline-flex items-center gap-1 text-[11px] font-mono text-slate-400 hover:text-slate-200 transition cursor-pointer"
+                        className="inline-flex items-center gap-1 text-[11px] font-mono text-slate-400 hover:text-slate-200 transition cursor-pointer shrink-0"
                         title={t('energyInbox.resetDefaults', 'Reset Defaults')}
                     >
-                        <RefreshCw size={11} />
+                        <RefreshCw size={11} className="shrink-0" />
                         <span>{t('energyInbox.resetDefaults', 'Reset Defaults')}</span>
                     </button>
                 </div>

@@ -175,28 +175,28 @@ export default function Calculator() {
             </div>
 
             {/* Mode Switcher Tabs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Mode 1 Button */}
                 <button
                     type="button"
                     onClick={() => setCalcMode('ESTIMATOR')}
-                    className={`p-5 rounded-2xl border text-left transition cursor-pointer flex items-start gap-4 shadow-lg ${
+                    className={`p-4 sm:p-5 rounded-2xl border text-left transition cursor-pointer flex items-start gap-3.5 shadow-lg ${
                         calcMode === 'ESTIMATOR'
                             ? 'bg-panel border-gold-500 ring-2 ring-gold-500/30'
                             : 'bg-darker/70 border-panelBorder text-slate-400 hover:text-white hover:bg-darker'
                     }`}
                 >
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                    <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 ${
                         calcMode === 'ESTIMATOR' ? 'bg-gold-500 text-darker shadow-md' : 'bg-dark text-slate-400'
                     }`}>
-                        <CalcIcon size={24} />
+                        <CalcIcon size={22} />
                     </div>
-                    <div>
-                        <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center justify-between gap-1.5">
                             <h2 className="text-base font-extrabold text-white">
                                 {language === 'ta' ? '1. விரைவு கட்டண கணிப்பான்' : '1. Quick Tariff Estimator'}
                             </h2>
-                            <span className="text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded bg-gold-500/15 text-gold-400 border border-gold-500/30">
+                            <span className="text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded bg-gold-500/15 text-gold-400 border border-gold-500/30 shrink-0">
                                 {language === 'ta' ? 'கணக்கீடு மட்டும்' : 'Sandbox Only'}
                             </span>
                         </div>
@@ -212,23 +212,23 @@ export default function Calculator() {
                 <button
                     type="button"
                     onClick={() => setCalcMode('BILL_GENERATOR')}
-                    className={`p-5 rounded-2xl border text-left transition cursor-pointer flex items-start gap-4 shadow-lg ${
+                    className={`p-4 sm:p-5 rounded-2xl border text-left transition cursor-pointer flex items-start gap-3.5 shadow-lg ${
                         calcMode === 'BILL_GENERATOR'
                             ? 'bg-panel border-emerald-500 ring-2 ring-emerald-500/30'
                             : 'bg-darker/70 border-panelBorder text-slate-400 hover:text-white hover:bg-darker'
                     }`}
                 >
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                    <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 ${
                         calcMode === 'BILL_GENERATOR' ? 'bg-emerald-500 text-darker shadow-md' : 'bg-dark text-slate-400'
                     }`}>
-                        <Receipt size={24} />
+                        <Receipt size={22} />
                     </div>
-                    <div>
-                        <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center justify-between gap-1.5">
                             <h2 className="text-base font-extrabold text-white">
                                 {language === 'ta' ? '2. அதிகாரப்பூர்வ பில் உருவாக்கம்' : '2. Official Bill Generator'}
                             </h2>
-                            <span className="text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            <span className="text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
                                 {language === 'ta' ? 'உண்மையான பதிவு' : 'Live Ledger'}
                             </span>
                         </div>
@@ -269,7 +269,7 @@ export default function Calculator() {
                             <label className="block text-xs uppercase tracking-wider font-bold text-slate-400 mb-2.5">
                                 {language === 'ta' ? 'கட்டணப் பிரிவைத் தேர்ந்தெடுக்கவும்' : 'Select Tariff Category'}
                             </label>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 {/* LT-1A Domestic */}
                                 <button
                                     type="button"

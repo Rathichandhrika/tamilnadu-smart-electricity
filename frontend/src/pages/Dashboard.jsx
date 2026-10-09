@@ -356,8 +356,8 @@ export default function Dashboard() {
                         </div>
                     )}
 
-                    <form onSubmit={handleKycUpload} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                        <div className="md:col-span-4 flex flex-col justify-end">
+                    <form onSubmit={handleKycUpload} className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-end">
+                        <div className="xl:col-span-4 flex flex-col justify-end">
                             <label className="block text-xs font-bold uppercase text-slate-400 mb-2 h-4 truncate">{t('documentType', 'Document Type')}</label>
                             <select
                                 value={docType}
@@ -370,7 +370,7 @@ export default function Dashboard() {
                             </select>
                         </div>
 
-                        <div className="md:col-span-5 flex flex-col justify-end">
+                        <div className="xl:col-span-5 flex flex-col justify-end">
                             <div className="flex items-center justify-between mb-2 h-4">
                                 <label className="block text-xs font-bold uppercase text-slate-400 truncate">
                                     {file ? t('selectedDoc', 'Selected Document (Max 10MB)') : t('attachDoc', 'Attach PDF / Image (Max 10MB)')}
@@ -450,8 +450,8 @@ export default function Dashboard() {
                             )}
                         </div>
 
-                        <div className="md:col-span-3 flex flex-col justify-end">
-                            <div className="h-4 mb-2 hidden md:block"></div>
+                        <div className="xl:col-span-3 flex flex-col justify-end">
+                            <div className="h-4 mb-2 hidden xl:block"></div>
                             <button
                                 type="submit"
                                 disabled={uploading || !file}

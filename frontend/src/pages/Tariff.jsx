@@ -28,7 +28,7 @@ export default function Tariff() {
     return (
         <div className="space-y-8 w-full">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-panelBorder pb-6">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-panelBorder pb-6">
                 <div>
                     <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
                         <Receipt className="text-gold-500" size={30} />
@@ -42,39 +42,39 @@ export default function Tariff() {
                 </div>
 
                 {/* 3-Tab Category Switcher */}
-                <div className="flex items-center gap-1.5 bg-panel border border-panelBorder p-1.5 rounded-2xl self-start md:self-auto shadow-xl">
+                <div className="flex items-center gap-1.5 bg-panel border border-panelBorder p-1.5 rounded-2xl shadow-xl overflow-x-auto max-w-full no-scrollbar">
                     <button
                         onClick={() => setActiveTab('domestic')}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap shrink-0 ${
                             activeTab === 'domestic'
                                 ? 'bg-gold-500 text-darker shadow-md'
                                 : 'text-slate-400 hover:text-white'
                         }`}
                     >
-                        <Home size={15} />
-                        {language === 'ta' ? 'LT-1A வீட்டு உபயோகம்' : 'LT-1A Domestic'}
+                        <Home size={15} className="shrink-0" />
+                        <span>{language === 'ta' ? 'LT-1A வீட்டு உபயோகம்' : 'LT-1A Domestic'}</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('commercial')}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap shrink-0 ${
                             activeTab === 'commercial'
                                 ? 'bg-gold-500 text-darker shadow-md'
                                 : 'text-slate-400 hover:text-white'
                         }`}
                     >
-                        <Building2 size={15} />
-                        {language === 'ta' ? 'LT-V வணிக உபயோகம்' : 'LT-V Commercial'}
+                        <Building2 size={15} className="shrink-0" />
+                        <span>{language === 'ta' ? 'LT-V வணிக உபயோகம்' : 'LT-V Commercial'}</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('industrial')}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap shrink-0 ${
                             activeTab === 'industrial'
                                 ? 'bg-gold-500 text-darker shadow-md'
                                 : 'text-slate-400 hover:text-white'
                         }`}
                     >
-                        <Factory size={15} />
-                        {language === 'ta' ? 'LT-IIIB தொழிற்துறை' : 'LT-IIIB Industrial'}
+                        <Factory size={15} className="shrink-0" />
+                        <span>{language === 'ta' ? 'LT-IIIB தொழிற்துறை' : 'LT-IIIB Industrial'}</span>
                     </button>
                 </div>
             </div>
@@ -108,17 +108,17 @@ export default function Tariff() {
                             </span>
                         </div>
                         <div className="overflow-x-auto pb-1 no-scrollbar">
-                            <div className="min-w-[420px] h-7 bg-darker rounded-xl overflow-hidden flex border border-panelBorder p-0.5 gap-0.5">
-                                <div className="h-full bg-emerald-500/80 rounded-l-lg flex items-center justify-center text-[10px] sm:text-xs font-bold text-darker font-mono px-1 whitespace-nowrap" style={{ width: '40%' }}>
+                            <div className="min-w-[500px] h-8 bg-darker rounded-xl overflow-hidden flex border border-panelBorder p-0.5 gap-0.5">
+                                <div className="h-full bg-emerald-500/80 rounded-l-lg flex items-center justify-center text-[10px] sm:text-xs font-bold text-darker font-mono px-2 whitespace-nowrap" style={{ width: '40%' }}>
                                     {language === 'ta' ? '0-200 இலவசம்' : '0-200 Free'}
                                 </div>
-                                <div className="h-full bg-emerald-600/80 flex items-center justify-center text-[10px] sm:text-xs font-bold text-emerald-100 font-mono px-1 whitespace-nowrap" style={{ width: '25%' }}>
+                                <div className="h-full bg-emerald-600/80 flex items-center justify-center text-[10px] sm:text-xs font-bold text-emerald-100 font-mono px-2 whitespace-nowrap" style={{ width: '25%' }}>
                                     201-400 ₹4.50
                                 </div>
-                                <div className="h-full bg-amber-600/80 flex items-center justify-center text-[10px] sm:text-xs font-bold text-amber-100 font-mono px-1 whitespace-nowrap" style={{ width: '15%' }}>
+                                <div className="h-full bg-amber-600/80 flex items-center justify-center text-[10px] sm:text-xs font-bold text-amber-100 font-mono px-2 whitespace-nowrap" style={{ width: '15%' }}>
                                     401-500 ₹6
                                 </div>
-                                <div className="h-full bg-rose-600/80 rounded-r-lg flex items-center justify-center text-[10px] sm:text-xs font-bold text-rose-100 font-mono px-1 whitespace-nowrap" style={{ width: '20%' }}>
+                                <div className="h-full bg-rose-600/80 rounded-r-lg flex items-center justify-center text-[10px] sm:text-xs font-bold text-rose-100 font-mono px-2 whitespace-nowrap" style={{ width: '20%' }}>
                                     &gt; 500 (₹8 - ₹11)
                                 </div>
                             </div>
