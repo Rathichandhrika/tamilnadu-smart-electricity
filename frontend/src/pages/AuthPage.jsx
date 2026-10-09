@@ -227,8 +227,13 @@ export default function AuthPage() {
             const res = await api.post('/auth/forgot-password', { email: trimmedEmail });
             if (res.data?.success) {
                 setForgotStep(2);
-                setResetCode('');
-                setGeneratedCodeNotice('');
+                if (res.data.previewCode) {
+                    setGeneratedCodeNotice(res.data.previewCode);
+                    setResetCode(res.data.previewCode);
+                } else {
+                    setResetCode('');
+                    setGeneratedCodeNotice('');
+                }
                 setSuccessMessage(res.data.message || t('auth.codeSentSuccess', 'A 6-digit verification code has been sent to your email address.'));
             } else {
                 setError(res.data?.message || 'Failed to send verification code.');
@@ -1046,6 +1051,23 @@ export default function AuthPage() {
                                                     </p>
                                                 </div>
                                             </div>
+
+                                            {/* Instant Verification Code Banner */}
+                                            {generatedCodeNotice && (
+                                                <div className="p-3 rounded-xl bg-gold-500/15 border border-gold-500/40 flex items-center justify-between gap-2">
+                                                    <div>
+                                                        <span className="text-[10px] uppercase font-bold text-gold-400 block tracking-wider">
+                                                            {language === 'ta' ? 'சரிபார்ப்புக் குறியீடு' : 'Verification Code'}
+                                                        </span>
+                                                        <span className="text-xl font-mono font-black text-white tracking-widest">
+                                                            {generatedCodeNotice}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-[10px] bg-gold-500/20 border border-gold-500/30 text-gold-300 px-2.5 py-1 rounded-lg font-bold">
+                                                        {language === 'ta' ? 'தானாக நிரப்பப்பட்டது' : 'Auto-Filled'}
+                                                    </span>
+                                                </div>
+                                            )}
 
                                             {/* Open Sent Email In-App Preview Button */}
                                             <div className="p-2.5 rounded-xl bg-panel/90 border border-gold-500/30 flex items-center justify-between gap-2 shadow-inner">
