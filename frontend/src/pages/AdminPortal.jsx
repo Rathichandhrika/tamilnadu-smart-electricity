@@ -545,12 +545,12 @@ export default function AdminPortal() {
 
                     {/* Action Bar & Batch Triggers */}
                     <div className="p-4 sm:p-5 rounded-2xl bg-darker border border-panelBorder flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-                        <div className="flex flex-row items-center gap-3 shrink-0">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full lg:w-auto">
                             <button
                                 type="button"
                                 disabled={scanningFines}
                                 onClick={handleRunOverdueScan}
-                                className="h-10 px-4 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 text-red-300 font-bold text-xs uppercase tracking-wider transition cursor-pointer inline-flex items-center justify-center gap-2 shadow-sm whitespace-nowrap shrink-0"
+                                className="w-full h-11 sm:h-10 px-4 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 text-red-300 font-bold text-xs uppercase tracking-wider transition cursor-pointer inline-flex items-center justify-center gap-2 shadow-sm whitespace-nowrap"
                             >
                                 <ShieldAlert size={16} className={`shrink-0 ${scanningFines ? 'animate-spin' : ''}`} />
                                 <span className="leading-none">{scanningFines ? (language === 'ta' ? 'ஆய்வு செய்கிறது...' : 'Scanning...') : (language === 'ta' ? 'தாமத அபராதக் கணக்கீடு' : 'Run Overdue Fine Scan')}</span>
@@ -560,15 +560,15 @@ export default function AdminPortal() {
                                 type="button"
                                 disabled={sendingReminders}
                                 onClick={handleSendReminders}
-                                className="h-10 px-4 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 font-bold text-xs uppercase tracking-wider transition cursor-pointer inline-flex items-center justify-center gap-2 shadow-sm whitespace-nowrap shrink-0"
+                                className="w-full h-11 sm:h-10 px-4 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 font-bold text-xs uppercase tracking-wider transition cursor-pointer inline-flex items-center justify-center gap-2 shadow-sm whitespace-nowrap"
                             >
                                 <Bell size={16} className={`shrink-0 ${sendingReminders ? 'animate-bounce' : ''}`} />
                                 <span className="leading-none">{sendingReminders ? (language === 'ta' ? 'அனுப்பப்படுகிறது...' : 'Dispatching...') : (language === 'ta' ? 'கடைசி நாள் நினைவூட்டல்' : 'Send Due Date Reminders')}</span>
                             </button>
                         </div>
 
-                        <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full lg:w-auto">
-                            <div className="relative flex-1 min-w-[180px] lg:w-56 xl:w-64">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full lg:w-auto lg:flex lg:flex-row">
+                            <div className="relative w-full sm:w-auto lg:w-56 xl:w-64">
                                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={15} />
                                 <input
                                     type="text"
@@ -582,7 +582,7 @@ export default function AdminPortal() {
                             <select
                                 value={billStatusFilter}
                                 onChange={(e) => setBillStatusFilter(e.target.value)}
-                                className="bg-dark border border-panelBorder text-white text-xs px-3 py-2.5 h-10 rounded-xl focus:border-gold-500 cursor-pointer"
+                                className="w-full sm:w-auto bg-dark border border-panelBorder text-white text-xs px-3 py-2.5 h-10 rounded-xl focus:border-gold-500 cursor-pointer"
                             >
                                 <option value="ALL">{language === 'ta' ? 'அனைத்து நிலை' : 'All Status'}</option>
                                 <option value="PENDING_VERIFICATION">{language === 'ta' ? 'சரிபார்ப்பு நிலுவை (Pending Verification)' : 'Pending Verification'}</option>
@@ -594,7 +594,7 @@ export default function AdminPortal() {
                             <select
                                 value={billDistrictFilter}
                                 onChange={(e) => setBillDistrictFilter(e.target.value)}
-                                className="bg-dark border border-panelBorder text-white text-xs px-3 py-2.5 h-10 rounded-xl focus:border-gold-500 cursor-pointer"
+                                className="w-full sm:w-auto bg-dark border border-panelBorder text-white text-xs px-3 py-2.5 h-10 rounded-xl focus:border-gold-500 cursor-pointer"
                             >
                                 <option value="ALL">{language === 'ta' ? 'அனைத்து மாவட்டம்' : 'All Districts'}</option>
                                 {districtsList.map(d => (
@@ -606,8 +606,8 @@ export default function AdminPortal() {
 
                     {/* Bills Table */}
                     <div className="bg-panel border border-panelBorder rounded-2xl shadow-xl overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs text-slate-300">
+                        <div className="overflow-x-auto no-scrollbar">
+                            <table className="w-full min-w-[860px] text-left text-xs text-slate-300">
                                 <thead className="bg-darker/90 text-slate-400 uppercase font-mono text-[10px] tracking-wider border-b border-panelBorder">
                                     <tr>
                                         <th className="p-4">{language === 'ta' ? 'நுகர்வோர் & இணைப்பு எண்' : 'Consumer & Service No'}</th>

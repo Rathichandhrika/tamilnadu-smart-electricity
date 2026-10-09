@@ -395,9 +395,9 @@ export default function Insights() {
                                         unitTextTa: '/ இருமாதம்'
                                     }
                                 ]).map(rec => (
-                                    <div key={rec.id} className="p-3.5 bg-darker border border-panelBorder rounded-xl flex items-center justify-between gap-3 hover:border-gold-500/40 transition">
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
+                                    <div key={rec.id} className="p-3.5 bg-darker border border-panelBorder rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:border-gold-500/40 transition">
+                                        <div className="min-w-0 w-full flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
                                                 <span className="text-xs font-bold text-white">
                                                     {language === 'ta' ? (rec.titleTa || rec.title) : rec.title}
                                                 </span>
@@ -411,7 +411,7 @@ export default function Insights() {
                                                 {language === 'ta' ? (rec.descriptionTa || rec.description) : rec.description}
                                             </p>
                                         </div>
-                                        <span className="text-xs font-mono font-bold text-gold-400 whitespace-nowrap bg-gold-500/10 border border-gold-500/20 px-2.5 py-1 rounded-lg shrink-0">
+                                        <span className="text-xs font-mono font-bold text-gold-400 whitespace-nowrap bg-gold-500/10 border border-gold-500/20 px-2.5 py-1 rounded-lg shrink-0 self-start sm:self-auto">
                                             {(rec.potentialSavings || '').replace(/\s*\/\s*(?:bi-monthly|இருமாதம்)/gi, '').trim()} {language === 'ta' ? '/ இருமாதம்' : '/ bi-monthly'}
                                         </span>
                                     </div>

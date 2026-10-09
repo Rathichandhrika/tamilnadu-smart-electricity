@@ -98,27 +98,29 @@ export default function Tariff() {
                     </div>
 
                     {/* Telescopic Comparison Visual Bar */}
-                    <div className="bg-panel border border-panelBorder p-6 rounded-2xl shadow-xl space-y-4">
-                        <div className="flex justify-between items-center text-xs">
+                    <div className="bg-panel border border-panelBorder p-4 sm:p-6 rounded-2xl shadow-xl space-y-4">
+                        <div className="flex flex-wrap justify-between items-center gap-2 text-xs">
                             <span className="font-bold text-white uppercase tracking-wider font-mono">
                                 {language === 'ta' ? 'படிநிலை அடுக்கு ஒப்பீடு' : 'Telescopic Slab Transition Bar'}
                             </span>
-                            <span className="text-gold-400 font-mono font-bold">
+                            <span className="text-gold-400 font-mono font-bold text-[11px] sm:text-xs">
                                 {language === 'ta' ? '500 kWh வரம்பு வரம்புக் கோடு' : '500 kWh Cutoff'}
                             </span>
                         </div>
-                        <div className="h-5 bg-darker rounded-xl overflow-hidden flex border border-panelBorder p-0.5 gap-0.5">
-                            <div className="h-full bg-emerald-500/80 rounded-l-lg flex items-center justify-center text-[10px] font-bold text-darker font-mono" style={{ width: '40%' }}>
-                                {language === 'ta' ? '0-200 இலவசம்' : '0-200 Free'}
-                            </div>
-                            <div className="h-full bg-emerald-600/80 flex items-center justify-center text-[10px] font-bold text-emerald-100 font-mono" style={{ width: '25%' }}>
-                                201-400 ₹4.50
-                            </div>
-                            <div className="h-full bg-amber-600/80 flex items-center justify-center text-[10px] font-bold text-amber-100 font-mono" style={{ width: '15%' }}>
-                                401-500 ₹6
-                            </div>
-                            <div className="h-full bg-rose-600/80 rounded-r-lg flex items-center justify-center text-[10px] font-bold text-rose-100 font-mono" style={{ width: '20%' }}>
-                                &gt; 500 (₹8 - ₹11)
+                        <div className="overflow-x-auto pb-1 no-scrollbar">
+                            <div className="min-w-[420px] h-7 bg-darker rounded-xl overflow-hidden flex border border-panelBorder p-0.5 gap-0.5">
+                                <div className="h-full bg-emerald-500/80 rounded-l-lg flex items-center justify-center text-[10px] sm:text-xs font-bold text-darker font-mono px-1 whitespace-nowrap" style={{ width: '40%' }}>
+                                    {language === 'ta' ? '0-200 இலவசம்' : '0-200 Free'}
+                                </div>
+                                <div className="h-full bg-emerald-600/80 flex items-center justify-center text-[10px] sm:text-xs font-bold text-emerald-100 font-mono px-1 whitespace-nowrap" style={{ width: '25%' }}>
+                                    201-400 ₹4.50
+                                </div>
+                                <div className="h-full bg-amber-600/80 flex items-center justify-center text-[10px] sm:text-xs font-bold text-amber-100 font-mono px-1 whitespace-nowrap" style={{ width: '15%' }}>
+                                    401-500 ₹6
+                                </div>
+                                <div className="h-full bg-rose-600/80 rounded-r-lg flex items-center justify-center text-[10px] sm:text-xs font-bold text-rose-100 font-mono px-1 whitespace-nowrap" style={{ width: '20%' }}>
+                                    &gt; 500 (₹8 - ₹11)
+                                </div>
                             </div>
                         </div>
                     </div>

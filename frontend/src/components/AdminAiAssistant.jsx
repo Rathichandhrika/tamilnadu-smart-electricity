@@ -231,22 +231,22 @@ export default function AdminAiAssistant({ onSelectBill, onRefreshBills }) {
     ];
 
     return (
-        <div className="bg-panel border border-panelBorder rounded-2xl shadow-xl overflow-hidden flex flex-col h-[640px]">
+        <div className="bg-panel border border-panelBorder rounded-2xl shadow-xl overflow-hidden flex flex-col h-[75vh] min-h-[500px] max-h-[680px]">
             {/* Header */}
-            <div className="p-4 bg-darker/80 border-b border-panelBorder flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold-500 to-amber-600 flex items-center justify-center text-darker shadow-lg shadow-gold-500/20">
-                        <BrainCircuit size={22} className="text-darker" />
+            <div className="p-3.5 sm:p-4 bg-darker/80 border-b border-panelBorder flex items-center justify-between">
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-gold-500 to-amber-600 flex items-center justify-center text-darker shadow-lg shadow-gold-500/20 shrink-0">
+                        <BrainCircuit size={20} className="text-darker" />
                     </div>
-                    <div>
-                        <h2 className="text-base font-extrabold text-white flex items-center gap-2">
-                            <span>{language === 'ta' ? 'TANGEDCO நிர்வாக ஏஐ உதவியாளர்' : 'TANGEDCO Executive AI Assistant'}</span>
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-gold-500/10 text-gold-400 border border-gold-500/30">
-                                LIVE NLP
+                    <div className="min-w-0">
+                        <h2 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2 truncate">
+                            <span>{language === 'ta' ? 'TANGEDCO நிர்வாக ஏஐ' : 'TANGEDCO Executive AI'}</span>
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-gold-500/10 text-gold-400 border border-gold-500/30 shrink-0">
+                                LIVE
                             </span>
                         </h2>
-                        <p className="text-xs text-slate-400">
-                            {language === 'ta' ? 'கட்டணம், நிலுவை, அபராதம் மற்றும் மாவட்ட நுண்ணறிவு' : 'Real-time billing, defaulters, fines & district analytics'}
+                        <p className="text-[11px] text-slate-400 truncate">
+                            {language === 'ta' ? 'கட்டணம், நிலுவை & மாவட்ட நுண்ணறிவு' : 'Billing, defaulters & district analytics'}
                         </p>
                     </div>
                 </div>
@@ -460,12 +460,12 @@ export default function AdminAiAssistant({ onSelectBill, onRefreshBills }) {
                     e.preventDefault();
                     handleSendQuery();
                 }}
-                className="p-3 bg-darker border-t border-panelBorder flex items-center gap-2"
+                className="p-2.5 sm:p-3 bg-darker border-t border-panelBorder flex items-center gap-2"
             >
                 <button
                     type="button"
                     onClick={toggleListening}
-                    className={`p-2.5 rounded-xl transition cursor-pointer flex items-center justify-center ${
+                    className={`p-2.5 rounded-xl transition cursor-pointer flex items-center justify-center shrink-0 ${
                         isListening 
                             ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/20' 
                             : 'bg-dark hover:bg-panel border border-panelBorder text-slate-400 hover:text-gold-400'
@@ -481,16 +481,16 @@ export default function AdminAiAssistant({ onSelectBill, onRefreshBills }) {
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder={
                         language === 'ta' 
-                            ? 'கேளுங்கள்: "யார் பணம் செலுத்தியுள்ளார்?", "நிலுவை நுகர்வோர்", "அபராதம்"...' 
-                            : 'Ask: "Who has paid?", "Show unpaid bills", "Who has fine imposed?", "District stats"...'
+                            ? 'கேளுங்கள்: "யார் பணம் செலுத்தியுள்ளார்?", "நிலுவை நுகர்வோர்"...' 
+                            : 'Ask: "Who has paid?", "Show unpaid bills", "District stats"...'
                     }
-                    className="flex-1 bg-dark border border-panelBorder text-white text-sm px-4 py-2.5 rounded-xl focus:outline-none focus:border-gold-500 placeholder:text-slate-600"
+                    className="flex-1 min-w-0 bg-dark border border-panelBorder text-white text-xs sm:text-sm px-3 sm:px-4 py-2.5 rounded-xl focus:outline-none focus:border-gold-500 placeholder:text-slate-600 truncate"
                 />
 
                 <button
                     type="submit"
                     disabled={!query.trim() || loading}
-                    className="p-2.5 rounded-xl bg-gold-500 hover:bg-gold-400 disabled:opacity-40 text-darker font-bold transition shadow-md cursor-pointer flex items-center justify-center"
+                    className="p-2.5 rounded-xl bg-gold-500 hover:bg-gold-400 disabled:opacity-40 text-darker font-bold transition shadow-md cursor-pointer flex items-center justify-center shrink-0"
                 >
                     <Send size={18} />
                 </button>
