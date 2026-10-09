@@ -176,16 +176,16 @@ export default function Payment() {
                                 <span className="text-gold-400 text-[11px] block font-sans font-bold">
                                     {language === 'ta' ? 'மின் இணைப்பு / சேவை எண்:' : 'Consumer Service Number:'}
                                 </span>
-                                <span className="text-white font-black text-sm block mt-0.5">{user?.consumerNumber || '04-123-456-789'}</span>
+                                <span className="text-white font-black text-sm block mt-0.5">{user?.serviceNumber || user?.consumerNumber || '04-123-004567'}</span>
                             </div>
                             <button
                                 type="button"
-                                onClick={() => copyToClipboard(user?.consumerNumber || '04-123-456-789', 'consumerNumber')}
+                                onClick={() => copyToClipboard(user?.serviceNumber || user?.consumerNumber || '04-123-004567', 'serviceNumber')}
                                 className="p-2 rounded-lg bg-gold-500/20 hover:bg-gold-500/30 text-gold-300 transition cursor-pointer flex items-center gap-1 text-[10px] font-sans font-bold"
                                 title="Copy Service Number"
                             >
-                                {copiedField === 'consumerNumber' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                                <span>{copiedField === 'consumerNumber' ? (language === 'ta' ? 'நகலெடுக்கப்பட்டது' : 'Copied') : (language === 'ta' ? 'நகலெடு' : 'Copy')}</span>
+                                {copiedField === 'serviceNumber' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                                <span>{copiedField === 'serviceNumber' ? (language === 'ta' ? 'நகலெடுக்கப்பட்டது' : 'Copied') : (language === 'ta' ? 'நகலெடு' : 'Copy')}</span>
                             </button>
                         </div>
 
@@ -200,7 +200,9 @@ export default function Payment() {
                             <span className="text-slate-400 text-[11px] block font-sans">
                                 {language === 'ta' ? 'அங்கீகரிக்கப்பட்ட சுமை:' : 'Sanctioned Load:'}
                             </span>
-                            <span className="text-white font-bold text-sm block mt-0.5">2.0 kW (Single Phase)</span>
+                            <span className="text-white font-bold text-sm block mt-0.5">
+                                {user?.sanctionedLoadKw ? `${user.sanctionedLoadKw} kW (${user.sanctionedLoadKw > 5 ? 'Three Phase' : 'Single Phase'})` : '2.0 kW (Single Phase)'}
+                            </span>
                         </div>
                     </div>
                 </div>

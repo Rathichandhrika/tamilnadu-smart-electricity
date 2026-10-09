@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import api from '../services/api';
 import socket from '../services/socket';
 import { useLanguage } from '../context/LanguageContext';
+import { AuthContext } from '../context/AuthContext';
 import { 
     Activity, Gauge, Zap, BatteryCharging, Radio, 
     Wifi, WifiOff, AlertTriangle, ShieldCheck, Cpu
@@ -10,11 +11,12 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 export default function LiveMeter() {
     const { t, language } = useLanguage();
+    const { user } = useContext(AuthContext);
     const [data, setData] = useState([]);
     const [latestReading, setLatestReading] = useState(null);
     const [isConnected, setIsConnected] = useState(socket.connected);
     const [streamSource, setStreamSource] = useState('CONNECTING');
-    const serviceNumber = "04-123-001234";
+    const serviceNumber = user?.serviceNumber || "04-123-001234";
 
     const lastAlertRef = useRef(null);
 
