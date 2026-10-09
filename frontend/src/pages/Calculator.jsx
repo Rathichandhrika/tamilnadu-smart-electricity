@@ -269,7 +269,7 @@ export default function Calculator() {
                             <label className="block text-xs uppercase tracking-wider font-bold text-slate-400 mb-2.5">
                                 {language === 'ta' ? 'கட்டணப் பிரிவைத் தேர்ந்தெடுக்கவும்' : 'Select Tariff Category'}
                             </label>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                                 {/* LT-1A Domestic */}
                                 <button
                                     type="button"
@@ -324,8 +324,8 @@ export default function Calculator() {
                         </div>
 
                         {/* Input Form */}
-                        <form onSubmit={handleCalculateEstimate} className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end pt-2">
-                            <div className={estConnectionType === 'LT-1A_DOMESTIC' ? 'sm:col-span-8' : 'sm:col-span-6'}>
+                        <form onSubmit={handleCalculateEstimate} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end pt-2">
+                            <div className={estConnectionType === 'LT-1A_DOMESTIC' ? 'md:col-span-8' : 'md:col-span-6'}>
                                 <label className="block text-xs uppercase tracking-wider font-bold text-slate-400 mb-2">
                                     {language === 'ta' ? 'மாதிரி இரு மாத மின் பயன்பாடு (kWh)' : 'Hypothetical Bi-Monthly Units (kWh)'}
                                 </label>
@@ -344,7 +344,7 @@ export default function Calculator() {
                             </div>
 
                             {estConnectionType !== 'LT-1A_DOMESTIC' && (
-                                <div className="sm:col-span-3">
+                                <div className="md:col-span-3">
                                     <label className="block text-xs uppercase tracking-wider font-bold text-slate-400 mb-2">
                                         {language === 'ta' ? 'அங்கீகரிக்கப்பட்ட சுமை (kW)' : 'Sanctioned Load (kW)'}
                                     </label>
@@ -363,7 +363,7 @@ export default function Calculator() {
                                 </div>
                             )}
 
-                            <div className={estConnectionType === 'LT-1A_DOMESTIC' ? 'sm:col-span-4' : 'sm:col-span-3'}>
+                            <div className={estConnectionType === 'LT-1A_DOMESTIC' ? 'md:col-span-4' : 'md:col-span-3'}>
                                 <button 
                                     type="submit" 
                                     disabled={estLoading}

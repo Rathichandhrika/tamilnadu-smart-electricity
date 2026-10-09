@@ -98,29 +98,27 @@ export default function Tariff() {
                     </div>
 
                     {/* Telescopic Comparison Visual Bar */}
-                    <div className="bg-panel border border-panelBorder p-4 sm:p-6 rounded-2xl shadow-xl space-y-4">
+                    <div className="bg-panel border border-panelBorder p-4 sm:p-6 rounded-2xl shadow-xl space-y-3 sm:space-y-4">
                         <div className="flex flex-wrap justify-between items-center gap-2 text-xs">
                             <span className="font-bold text-white uppercase tracking-wider font-mono">
                                 {language === 'ta' ? 'படிநிலை அடுக்கு ஒப்பீடு' : 'Telescopic Slab Transition Bar'}
                             </span>
                             <span className="text-gold-400 font-mono font-bold text-[11px] sm:text-xs">
-                                {language === 'ta' ? '500 kWh வரம்பு வரம்புக் கோடு' : '500 kWh Cutoff'}
+                                {language === 'ta' ? '500 kWh வரம்பு' : '500 kWh Cutoff'}
                             </span>
                         </div>
-                        <div className="overflow-x-auto pb-1 no-scrollbar">
-                            <div className="min-w-[500px] h-8 bg-darker rounded-xl overflow-hidden flex border border-panelBorder p-0.5 gap-0.5">
-                                <div className="h-full bg-emerald-500/80 rounded-l-lg flex items-center justify-center text-[10px] sm:text-xs font-bold text-darker font-mono px-2 whitespace-nowrap" style={{ width: '40%' }}>
-                                    {language === 'ta' ? '0-200 இலவசம்' : '0-200 Free'}
-                                </div>
-                                <div className="h-full bg-emerald-600/80 flex items-center justify-center text-[10px] sm:text-xs font-bold text-emerald-100 font-mono px-2 whitespace-nowrap" style={{ width: '25%' }}>
-                                    201-400 ₹4.50
-                                </div>
-                                <div className="h-full bg-amber-600/80 flex items-center justify-center text-[10px] sm:text-xs font-bold text-amber-100 font-mono px-2 whitespace-nowrap" style={{ width: '15%' }}>
-                                    401-500 ₹6
-                                </div>
-                                <div className="h-full bg-rose-600/80 rounded-r-lg flex items-center justify-center text-[10px] sm:text-xs font-bold text-rose-100 font-mono px-2 whitespace-nowrap" style={{ width: '20%' }}>
-                                    &gt; 500 (₹8 - ₹11)
-                                </div>
+                        <div className="w-full h-8 sm:h-9 bg-darker rounded-xl overflow-hidden flex border border-panelBorder p-0.5 gap-0.5">
+                            <div className="h-full bg-emerald-500/85 rounded-l-lg flex items-center justify-center text-[10px] sm:text-xs font-bold text-darker font-mono px-1 truncate" style={{ width: '38%' }} title={language === 'ta' ? '0-200 இலவசம்' : '0-200 Free'}>
+                                {language === 'ta' ? '0-200 இலவசம்' : '0-200 Free'}
+                            </div>
+                            <div className="h-full bg-emerald-600/85 flex items-center justify-center text-[10px] sm:text-xs font-bold text-emerald-100 font-mono px-1 truncate" style={{ width: '24%' }} title="201-400 ₹4.50">
+                                201-400 ₹4.50
+                            </div>
+                            <div className="h-full bg-amber-600/85 flex items-center justify-center text-[10px] sm:text-xs font-bold text-amber-100 font-mono px-1 truncate" style={{ width: '18%' }} title="401-500 ₹6">
+                                401-500 ₹6
+                            </div>
+                            <div className="h-full bg-rose-600/85 rounded-r-lg flex items-center justify-center text-[10px] sm:text-xs font-bold text-rose-100 font-mono px-1 truncate" style={{ width: '20%' }} title="> 500 (₹8 - ₹11)">
+                                &gt; 500 (₹8-11)
                             </div>
                         </div>
                     </div>

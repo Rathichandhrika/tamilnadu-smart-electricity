@@ -45,7 +45,7 @@ export default function Layout({ children }) {
             <Sidebar isOpen={isMobileMenuOpen} close={() => setIsMobileMenuOpen(false)} />
 
             {/* 3. Main Content Area */}
-            <main className="flex-1 p-4 sm:p-6 pt-20 md:pt-8 md:ml-72 min-h-screen pb-20 min-w-0 max-w-full overflow-x-hidden">
+            <main className="flex-1 p-4 sm:p-6 pt-20 md:pt-8 md:ml-72 min-h-screen pb-28 sm:pb-32 min-w-0 max-w-full overflow-x-hidden">
                 <AnimatePresence mode="wait">
                     <motion.div
                         key={location.pathname}
