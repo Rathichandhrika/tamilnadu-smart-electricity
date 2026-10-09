@@ -259,13 +259,20 @@ const googleAuth = async (req, res) => {
                 isActive: true
             });
 
-            // Create Consumer Profile with provided Service Number, Category & Load
+            const userDistrict = (req.body.district && req.body.district.trim()) ? req.body.district.trim() : 'Chennai';
+
+            // Create Consumer Profile with provided Service Number, Category, Load & District
             await Consumer.create({
                 user: user._id,
                 serviceNumber: serviceNumber.trim(),
                 sanctionedLoadKw: Number(sanctionedLoadKw) || (selectedConnectionType === 'LT-IIIB_INDUSTRIAL' ? 10.0 : 2.0),
                 connectionType: selectedConnectionType,
                 tariffCategory: tariffCategory,
+                district: userDistrict,
+                address: {
+                    district: userDistrict,
+                    city: userDistrict
+                },
                 verificationStatus: 'PENDING',
                 kycDocuments: []
             });

@@ -305,6 +305,7 @@ export default function AuthPage() {
                         accessToken: tokenResponse.access_token,
                         serviceNumber: '',
                         connectionType: 'LT-1A_DOMESTIC',
+                        district: 'Chennai',
                         sanctionedLoadKw: 2.0
                     });
                 } else if (result && result.success) {
@@ -340,6 +341,7 @@ export default function AuthPage() {
                 accessToken: googleOnboarding.accessToken,
                 serviceNumber: googleOnboarding.serviceNumber.trim(),
                 connectionType: googleOnboarding.connectionType,
+                district: googleOnboarding.district || 'Chennai',
                 sanctionedLoadKw: Number(googleOnboarding.sanctionedLoadKw) || 2.0
             });
 
@@ -1272,18 +1274,39 @@ export default function AuthPage() {
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="block text-slate-400 text-[10px] font-bold uppercase mb-1">
-                                    {t('auth.serviceNumber', 'TNEB Service Number')} *
-                                </label>
-                                <input
-                                    type="text"
-                                    required
-                                    placeholder={t('auth.serviceNumberPlaceholder', 'e.g., 04-123-004567')}
-                                    value={googleOnboarding.serviceNumber}
-                                    onChange={(e) => setGoogleOnboarding({ ...googleOnboarding, serviceNumber: e.target.value })}
-                                    className="w-full bg-dark border border-panelBorder text-white p-2.5 rounded-xl text-sm font-mono focus:border-gold-500 placeholder:text-slate-600"
-                                />
+                            {/* District & Service Number */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-slate-400 text-[10px] font-bold uppercase mb-1 flex items-center gap-1">
+                                        <MapPin size={11} className="text-gold-400" />
+                                        <span>{language === 'ta' ? 'மாவட்டம்' : 'District'} *</span>
+                                    </label>
+                                    <select
+                                        value={googleOnboarding.district || 'Chennai'}
+                                        onChange={(e) => setGoogleOnboarding({ ...googleOnboarding, district: e.target.value })}
+                                        className="w-full bg-dark border border-panelBorder text-white p-2.5 rounded-xl text-sm focus:border-gold-500 cursor-pointer"
+                                    >
+                                        {TN_DISTRICTS.map((d) => (
+                                            <option key={d.en} value={d.en} className="bg-dark text-white">
+                                                {language === 'ta' ? `${d.ta} (${d.en})` : `${d.en} (${d.ta})`}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-slate-400 text-[10px] font-bold uppercase mb-1">
+                                        {t('auth.serviceNumber', 'TNEB Service Number')} *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder={t('auth.serviceNumberPlaceholder', 'e.g., 04-123-004567')}
+                                        value={googleOnboarding.serviceNumber}
+                                        onChange={(e) => setGoogleOnboarding({ ...googleOnboarding, serviceNumber: e.target.value })}
+                                        className="w-full bg-dark border border-panelBorder text-white p-2.5 rounded-xl text-sm font-mono focus:border-gold-500 placeholder:text-slate-600"
+                                    />
+                                </div>
                             </div>
 
                             <div>
