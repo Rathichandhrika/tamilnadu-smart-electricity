@@ -1,11 +1,12 @@
 const User = require('../models/User');
 const Consumer = require('../models/Consumer');
+const Alert = require('../models/Alert');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 const { OAuth2Client } = require('google-auth-library');
-const { sendPasswordResetEmail, getLastSentEmail } = require('../services/emailService');
+const { sendPasswordResetEmail } = require('../services/emailService');
 
 // Google OAuth Client
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -423,6 +424,39 @@ const uploadKycDocument = async (req, res) => {
             await consumer.save();
         }
 
+        // Notify Admin of new KYC document submission
+        try {
+            const docTypeLabel = req.body.documentType === 'PROPERTY_TAX' 
+                ? 'Property Tax Receipt' 
+                : req.body.documentType === 'COMMERCIAL_LICENSE' 
+                    ? 'Commercial Trade License' 
+                    : 'Aadhar Card (Identity Proof)';
+            const docTypeLabelTa = req.body.documentType === 'PROPERTY_TAX' 
+                ? 'சொத்து வரி ரசீது' 
+                : req.body.documentType === 'COMMERCIAL_LICENSE' 
+                    ? 'வணிக உரிமம்' 
+                    : 'ஆதார் அட்டை (அடையாளச் சான்று)';
+
+            const serviceNo = consumer?.serviceNumber || user.serviceNumber || '04-123-001234';
+            const adminUsers = await User.find({ role: 'ADMIN' });
+            
+            for (const admin of adminUsers) {
+                await Alert.create({
+                    type: 'KYC_STATUS',
+                    severity: 'HIGH',
+                    title: `e-KYC Document Uploaded: ${user.name}`,
+                    titleTa: `புதிய e-KYC ஆவணம் பதிவேற்றப்பட்டது: ${user.name}`,
+                    message: `Consumer ${user.name} (Service No: ${serviceNo}) uploaded a new ${docTypeLabel} for accreditation. Please verify in the e-KYC tab.`,
+                    messageTa: `நுகர்வோர் ${user.name} (இணைப்பு எண்: ${serviceNo}) தனது அங்கீகாரத்திற்காக ${docTypeLabelTa} ஆவணத்தை சமர்ப்பித்துள்ளார். தயவுசெய்து e-KYC பகுதியில் சரிபார்க்கவும்.`,
+                    consumer: consumer?._id,
+                    user: admin._id,
+                    isResolved: false
+                });
+            }
+        } catch (alertErr) {
+            console.error('Error notifying admin of KYC upload:', alertErr);
+        }
+
         res.status(200).json({
             success: true,
             message: 'KYC Document submitted successfully and is now pending admin approval.',
@@ -444,8 +478,8 @@ const uploadKycDocument = async (req, res) => {
 // @access  Private
 const deleteKycDocument = async (req, res) => {
     try {
-        const documentPath = req.body?.documentPath || req.query?.documentPath;
-        if (!documentPath) {
+        const rawPath = req.body?.documentPath || req.query?.documentPath;
+        if (!rawPath) {
             return res.status(400).json({ 
                 success: false, 
                 message: 'Document path is required.' 
@@ -457,9 +491,27 @@ const deleteKycDocument = async (req, res) => {
             return res.status(404).json({ success: false, message: 'User account not found.' });
         }
 
-        // Verify document belongs to this user
-        const docIndex = (user.kycDocuments || []).indexOf(documentPath);
-        if (docIndex === -1) {
+        const targetBase = path.basename(rawPath).toLowerCase();
+        const targetClean = rawPath.replace(/^https?:\/\/[^\/]+/, '').replace(/^\/+/, '');
+
+        // Match helper function supporting basename, relative path, or exact string
+        const isMatch = (item) => {
+            if (!item) return false;
+            if (item === rawPath) return true;
+            if (path.basename(item).toLowerCase() === targetBase) return true;
+            const itemClean = item.replace(/^https?:\/\/[^\/]+/, '').replace(/^\/+/, '');
+            if (itemClean === targetClean) return true;
+            if (item.endsWith(targetBase)) return true;
+            return false;
+        };
+
+        const consumer = await Consumer.findOne({ user: user._id });
+
+        const userHasDoc = (user.kycDocuments || []).some(isMatch);
+        const consumerHasDoc = (consumer?.kycDocuments || []).some(isMatch);
+
+        // Allow Admin to delete any consumer's document if needed, or verify user ownership
+        if (!userHasDoc && !consumerHasDoc && req.user.role !== 'ADMIN') {
             return res.status(404).json({ 
                 success: false, 
                 message: 'Document not found in user records.' 
@@ -467,19 +519,24 @@ const deleteKycDocument = async (req, res) => {
         }
 
         // Remove from User document list
-        user.kycDocuments.splice(docIndex, 1);
+        user.kycDocuments = (user.kycDocuments || []).filter(doc => !isMatch(doc));
+        if (user.kycDocuments.length === 0 && user.verificationStatus !== 'APPROVED') {
+            user.verificationStatus = 'PENDING';
+        }
         await user.save();
 
         // Also remove from Consumer document list if present
-        const consumer = await Consumer.findOne({ user: user._id });
         if (consumer && consumer.kycDocuments) {
-            consumer.kycDocuments = consumer.kycDocuments.filter(doc => doc !== documentPath);
+            consumer.kycDocuments = consumer.kycDocuments.filter(doc => !isMatch(doc));
+            if (consumer.kycDocuments.length === 0 && consumer.verificationStatus !== 'APPROVED') {
+                consumer.verificationStatus = 'PENDING';
+            }
             await consumer.save();
         }
 
         // Safely remove the physical file from the disk storage
         try {
-            const fileName = path.basename(documentPath);
+            const fileName = path.basename(targetBase);
             const uploadDir = path.resolve(__dirname, '../../uploads/kyc');
             const filePath = path.join(uploadDir, fileName);
 
@@ -528,12 +585,21 @@ const forgotPassword = async (req, res) => {
         await user.save();
 
         // Dispatch verification code to the consumer's registered email
-        await sendPasswordResetEmail(user.email, resetCode, user.name || 'Valued Consumer');
+        const dispatchResult = await sendPasswordResetEmail(user.email, resetCode, user.name || 'Valued Consumer');
+
+        if (!dispatchResult.success) {
+            console.error(`[AUTH FORGOT PASSWORD ERROR] Dispatch failed for ${user.email}:`, dispatchResult.error);
+            return res.status(500).json({
+                success: false,
+                message: `Failed to deliver verification code email to ${user.email}: ${dispatchResult.error || 'Mail delivery error'}. Please verify your network or SMTP configuration.`
+            });
+        }
 
         res.status(200).json({
             success: true,
-            message: `A 6-digit verification code has been sent to ${user.email}. Please check your inbox and spam folder.`,
-            previewCode: resetCode
+            message: `A 6-digit verification code has been successfully dispatched to ${user.email}. Please check your inbox and spam folder.`,
+            email: user.email,
+            method: dispatchResult.method
         });
     } catch (error) {
         console.error('Forgot Password Error:', error);
@@ -585,30 +651,6 @@ const resetPassword = async (req, res) => {
     }
 };
 
-// @desc    Get latest dispatched verification email preview
-// @route   GET /api/auth/latest-email
-const getLatestEmail = async (req, res) => {
-    try {
-        const { email } = req.query;
-        const latest = getLastSentEmail();
-
-        if (!latest) {
-            return res.status(404).json({ success: false, message: 'No dispatched emails found yet.' });
-        }
-
-        if (email && latest.to.toLowerCase() !== email.toLowerCase().trim()) {
-            return res.status(404).json({ success: false, message: 'No recent emails found for this address.' });
-        }
-
-        res.status(200).json({
-            success: true,
-            data: latest
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
-};
-
 module.exports = { 
     registerUser, 
     loginUser, 
@@ -618,6 +660,5 @@ module.exports = {
     uploadKycDocument,
     deleteKycDocument,
     forgotPassword,
-    resetPassword,
-    getLatestEmail
+    resetPassword
 };

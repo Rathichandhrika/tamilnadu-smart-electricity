@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGoogleLogin } from '@react-oauth/google';
 import api from '../services/api';
-import { Zap, Activity, BrainCircuit, Sun, ArrowRight, ShieldCheck, Eye, EyeOff, User, KeyRound, CheckCircle2, ArrowLeft, Globe, Sparkles, Mail, ExternalLink, X, Copy, Check, Inbox, MapPin } from 'lucide-react';
+import { Zap, Activity, BrainCircuit, Sun, ArrowRight, ShieldCheck, Eye, EyeOff, User, KeyRound, CheckCircle2, ArrowLeft, Globe, Sparkles, Mail, MapPin } from 'lucide-react';
 
 const TN_DISTRICTS = [
     { en: 'Ariyalur', ta: 'அரியலூர்' },
@@ -92,28 +92,6 @@ export default function AuthPage() {
     const [resetCode, setResetCode] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmNewPassword, setConfirmNewPassword] = useState('');
-    const [generatedCodeNotice, setGeneratedCodeNotice] = useState('');
-    const [inboxModalOpen, setInboxModalOpen] = useState(false);
-    const [latestEmailData, setLatestEmailData] = useState(null);
-    const [loadingEmail, setLoadingEmail] = useState(false);
-    const [copiedCode, setCopiedCode] = useState(false);
-
-    const handleFetchLatestEmail = async () => {
-        setLoadingEmail(true);
-        try {
-            const res = await api.get(`/auth/latest-email?email=${encodeURIComponent(forgotEmail.trim())}`);
-            if (res.data?.success && res.data?.data) {
-                setLatestEmailData(res.data.data);
-                setInboxModalOpen(true);
-            } else {
-                setError(language === 'ta' ? 'அனுப்பப்பட்ட மின்னஞ்சல் கிடைக்கவில்லை.' : 'No dispatched email found for this address.');
-            }
-        } catch (err) {
-            setError(language === 'ta' ? 'அனுப்பப்பட்ட மின்னஞ்சல் முன்னோட்டம் கிடைக்கவில்லை.' : 'Dispatched email preview is not yet available.');
-        } finally {
-            setLoadingEmail(false);
-        }
-    };
 
     // Ensure all forms and fields are completely reset whenever user logs out or lands on AuthPage
     useEffect(() => {
@@ -136,7 +114,6 @@ export default function AuthPage() {
         setResetCode('');
         setNewPassword('');
         setConfirmNewPassword('');
-        setGeneratedCodeNotice('');
         setForgotStep(1);
     }, [user]);
 
@@ -214,7 +191,6 @@ export default function AuthPage() {
         if (e && e.preventDefault) e.preventDefault();
         setError('');
         setSuccessMessage('');
-        setGeneratedCodeNotice('');
         const trimmedEmail = forgotEmail.trim();
 
         if (!trimmedEmail) {
@@ -227,13 +203,7 @@ export default function AuthPage() {
             const res = await api.post('/auth/forgot-password', { email: trimmedEmail });
             if (res.data?.success) {
                 setForgotStep(2);
-                if (res.data.previewCode) {
-                    setGeneratedCodeNotice(res.data.previewCode);
-                    setResetCode(res.data.previewCode);
-                } else {
-                    setResetCode('');
-                    setGeneratedCodeNotice('');
-                }
+                setResetCode('');
                 setSuccessMessage(res.data.message || t('auth.codeSentSuccess', 'A 6-digit verification code has been sent to your email address.'));
             } else {
                 setError(res.data?.message || 'Failed to send verification code.');
@@ -281,7 +251,6 @@ export default function AuthPage() {
                 setNewPassword('');
                 setConfirmNewPassword('');
                 setResetCode('');
-                setGeneratedCodeNotice('');
                 setForgotStep(1);
                 setTimeout(() => {
                     setActiveTab('login');
@@ -1052,41 +1021,7 @@ export default function AuthPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Instant Verification Code Banner */}
-                                            {generatedCodeNotice && (
-                                                <div className="p-3 rounded-xl bg-gold-500/15 border border-gold-500/40 flex items-center justify-between gap-2">
-                                                    <div>
-                                                        <span className="text-[10px] uppercase font-bold text-gold-400 block tracking-wider">
-                                                            {language === 'ta' ? 'சரிபார்ப்புக் குறியீடு' : 'Verification Code'}
-                                                        </span>
-                                                        <span className="text-xl font-mono font-black text-white tracking-widest">
-                                                            {generatedCodeNotice}
-                                                        </span>
-                                                    </div>
-                                                    <span className="text-[10px] bg-gold-500/20 border border-gold-500/30 text-gold-300 px-2.5 py-1 rounded-lg font-bold">
-                                                        {language === 'ta' ? 'தானாக நிரப்பப்பட்டது' : 'Auto-Filled'}
-                                                    </span>
-                                                </div>
-                                            )}
 
-                                            {/* Open Sent Email In-App Preview Button */}
-                                            <div className="p-2.5 rounded-xl bg-panel/90 border border-gold-500/30 flex items-center justify-between gap-2 shadow-inner">
-                                                <div className="flex items-center gap-2">
-                                                    <Inbox size={15} className="text-gold-400 shrink-0" />
-                                                    <span className="text-[11px] text-slate-300 font-medium">
-                                                        {language === 'ta' ? 'அனுப்பப்பட்ட மின்னஞ்சல்' : 'Dispatched Mailbox'}
-                                                    </span>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={handleFetchLatestEmail}
-                                                    disabled={loadingEmail}
-                                                    className="px-2.5 py-1 rounded-lg bg-gold-500/20 hover:bg-gold-500/30 border border-gold-500/40 text-gold-300 hover:text-gold-200 text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                                >
-                                                    <ExternalLink size={12} />
-                                                    {loadingEmail ? 'Loading...' : (language === 'ta' ? 'இன்பாக்ஸைத் திறக்கவும்' : 'Open Inbox Preview')}
-                                                </button>
-                                            </div>
 
                                             <div>
                                                 <div className="flex items-center justify-between mb-1">
@@ -1368,87 +1303,7 @@ export default function AuthPage() {
                 </div>
             )}
 
-            {/* In-App Mailbox Preview Modal (Accessible when ISP blocks standard SMTP ports) */}
-            {inboxModalOpen && latestEmailData && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="bg-panel border border-panelBorder rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
-                    >
-                        {/* Modal Header */}
-                        <div className="p-4 bg-gradient-to-r from-slate-900 to-darker border-b border-panelBorder flex items-center justify-between">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-lg bg-gold-500/10 border border-gold-500/30 flex items-center justify-center text-gold-400">
-                                    <Mail size={16} />
-                                </div>
-                                <div>
-                                    <h3 className="text-white font-bold text-sm">
-                                        {language === 'ta' ? 'அனுப்பப்பட்ட சரிபார்ப்பு மின்னஞ்சல்' : 'Dispatched Verification Email'}
-                                    </h3>
-                                    <p className="text-[10px] text-slate-400">
-                                        To: <span className="text-gold-400 font-mono">{latestEmailData.to}</span>
-                                    </p>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setInboxModalOpen(false)}
-                                className="w-7 h-7 rounded-lg bg-dark/60 hover:bg-dark border border-panelBorder flex items-center justify-center text-slate-400 hover:text-white cursor-pointer"
-                            >
-                                <X size={15} />
-                            </button>
-                        </div>
 
-                        {/* Quick Copy Verification Code Banner */}
-                        <div className="bg-gold-500/10 border-b border-gold-500/20 p-3 flex items-center justify-between gap-3">
-                            <div>
-                                <span className="text-[10px] uppercase font-bold text-gold-400 tracking-wider block">
-                                    {language === 'ta' ? 'சரிபார்ப்புக் குறியீடு' : 'Verification Code'}
-                                </span>
-                                <span className="text-xl font-black font-mono tracking-widest text-white">
-                                    {latestEmailData.code}
-                                </span>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setResetCode(latestEmailData.code);
-                                    setCopiedCode(true);
-                                    setTimeout(() => {
-                                        setCopiedCode(false);
-                                        setInboxModalOpen(false);
-                                    }, 800);
-                                }}
-                                className="px-3.5 py-1.5 rounded-xl bg-gold-500 hover:bg-gold-400 text-darker font-extrabold text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition uppercase tracking-wider"
-                            >
-                                {copiedCode ? <Check size={14} /> : <Copy size={14} />}
-                                {copiedCode ? (language === 'ta' ? 'பயன்படுத்தப்பட்டது!' : 'Applied!') : (language === 'ta' ? 'குறியீட்டை உள்ளிடவும்' : 'Insert Code')}
-                            </button>
-                        </div>
-
-                        {/* Email HTML / Rendered Content Container */}
-                        <div className="p-4 overflow-y-auto flex-1 text-slate-300 text-xs">
-                            <div
-                                className="rounded-xl overflow-hidden shadow-inner bg-darker p-2"
-                                dangerouslySetInnerHTML={{ __html: latestEmailData.html }}
-                            />
-                        </div>
-
-                        {/* Modal Footer */}
-                        <div className="p-3 bg-darker/60 border-t border-panelBorder flex justify-end">
-                            <button
-                                type="button"
-                                onClick={() => setInboxModalOpen(false)}
-                                className="px-4 py-1.5 rounded-xl bg-dark hover:bg-panel border border-panelBorder text-slate-300 hover:text-white text-xs font-semibold cursor-pointer"
-                            >
-                                {language === 'ta' ? 'மூடு' : 'Close'}
-                            </button>
-                        </div>
-                    </motion.div>
-                </div>
-            )}
         </div>
     );
 }

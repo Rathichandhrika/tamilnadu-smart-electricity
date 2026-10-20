@@ -9,8 +9,7 @@ const {
     uploadKycDocument,
     deleteKycDocument,
     forgotPassword,
-    resetPassword,
-    getLatestEmail
+    resetPassword
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
@@ -21,7 +20,6 @@ router.post('/google', googleAuth);
 router.post('/logout', logoutUser);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
-router.get('/latest-email', getLatestEmail);
 router.get('/me', protect, getMe);
 router.post('/kyc/upload', protect, upload.single('document'), uploadKycDocument);
 router.delete('/kyc/document', protect, deleteKycDocument);

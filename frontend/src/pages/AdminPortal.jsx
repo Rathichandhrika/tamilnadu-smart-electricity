@@ -35,7 +35,8 @@ import {
     Wind,
     Flame,
     BarChart3,
-    TrendingUp
+    TrendingUp,
+    Check
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import AdminAiAssistant from '../components/AdminAiAssistant';
@@ -107,6 +108,22 @@ const formatVerificationStatus = (st, lang) => {
         return 'நிலுவையில்';
     }
     return st || 'PENDING';
+};
+
+const getDocUrl = (doc) => {
+    if (!doc) return '#';
+    if (doc.startsWith('http://') || doc.startsWith('https://')) return doc;
+    const base = api.defaults.baseURL ? api.defaults.baseURL.replace(/\/api\/?$/, '') : `http://${window.location.hostname || 'localhost'}:5000`;
+    return `${base}${doc.startsWith('/') ? '' : '/'}${doc}`;
+};
+
+const getConsumerDocs = (c) => {
+    if (!c) return [];
+    const set = new Set([
+        ...(Array.isArray(c.kycDocuments) ? c.kycDocuments : []),
+        ...(Array.isArray(c.user?.kycDocuments) ? c.user.kycDocuments : [])
+    ]);
+    return Array.from(set).filter(Boolean);
 };
 
 export default function AdminPortal() {
@@ -204,6 +221,11 @@ export default function AdminPortal() {
         fetchAdminPortalData();
         fetchBillsData();
     }, []);
+
+    // Reset document index whenever selected consumer changes
+    useEffect(() => {
+        setSelectedDocIndex(0);
+    }, [selectedConsumer]);
 
     // KYC Status Update
     const handleStatusUpdate = async (consumerId, newStatus, remarks = '') => {
@@ -381,6 +403,23 @@ export default function AdminPortal() {
         }
     };
 
+    // Demo Scenario Helper: Adjust Bill Due Date on the fly
+    const handleAdjustBillDate = async (billId, scenario) => {
+        setActionLoading(true);
+        try {
+            const res = await api.put(`/bills/${billId}/adjust-date`, { scenario });
+            if (res.data?.success) {
+                showToast(res.data.message || `Bill adjusted to ${scenario}.`);
+                fetchBillsData();
+            }
+        } catch (err) {
+            console.error('Date adjust error:', err);
+            showToast(err.response?.data?.message || 'Failed to adjust bill date.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     // Filter Consumers for KYC
     const filteredConsumers = consumers.filter(consumer => {
         const matchesStatus = statusFilter === 'ALL' || consumer.verificationStatus === statusFilter;
@@ -396,7 +435,11 @@ export default function AdminPortal() {
 
     // Filter Bills
     const filteredBills = bills.filter(bill => {
-        const matchesStatus = billStatusFilter === 'ALL' || bill.status === billStatusFilter;
+        const matchesStatus = billStatusFilter === 'ALL'
+            ? true
+            : (billStatusFilter === 'DUE_SOON' || billStatusFilter === 'DUE_REMINDER')
+                ? (bill.status === 'UNPAID' && (bill.isNearingDue || bill.dueAlertSent || (bill.daysRemaining >= 0 && bill.daysRemaining <= 3)))
+                : bill.status === billStatusFilter;
         const matchesDistrict = billDistrictFilter === 'ALL' || bill.district?.toLowerCase() === billDistrictFilter.toLowerCase();
         const q = billSearch.toLowerCase().trim();
         const matchesSearch = !q || (
@@ -490,7 +533,13 @@ export default function AdminPortal() {
                     {billsSummary && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                             {/* Total Billed */}
-                            <div className="bg-panel border border-panelBorder p-5 rounded-2xl flex flex-col justify-between">
+                            <div 
+                                onClick={() => setBillStatusFilter('ALL')}
+                                className={`bg-panel border p-5 rounded-2xl flex flex-col justify-between cursor-pointer transition-all hover:scale-[1.02] shadow-sm ${
+                                    billStatusFilter === 'ALL' ? 'border-blue-500 ring-2 ring-blue-500/40 bg-blue-500/5' : 'border-panelBorder hover:border-blue-500/40'
+                                }`}
+                                title="Click to view all bills"
+                            >
                                 <div className="flex justify-between items-center text-xs font-bold uppercase text-slate-400">
                                     <span>{language === 'ta' ? 'மொத்த மின்கட்டணம்' : 'Total Billed'}</span>
                                     <Receipt size={16} className="text-blue-400" />
@@ -500,9 +549,15 @@ export default function AdminPortal() {
                             </div>
 
                             {/* Total Collected (PAID) */}
-                            <div className="bg-panel border border-emerald-500/30 p-5 rounded-2xl flex flex-col justify-between">
+                            <div 
+                                onClick={() => setBillStatusFilter('PAID')}
+                                className={`bg-panel border p-5 rounded-2xl flex flex-col justify-between cursor-pointer transition-all hover:scale-[1.02] shadow-sm ${
+                                    billStatusFilter === 'PAID' ? 'border-emerald-500 ring-2 ring-emerald-500/40 bg-emerald-500/10' : 'border-emerald-500/30 hover:border-emerald-500/60'
+                                }`}
+                                title="Click to filter Payment Done consumers"
+                            >
                                 <div className="flex justify-between items-center text-xs font-bold uppercase text-emerald-400">
-                                    <span>{language === 'ta' ? 'செலுத்தப்பட்ட தொகை (Paid)' : 'Total Collected'}</span>
+                                    <span>{language === 'ta' ? 'செலுத்தப்பட்ட தொகை (Paid)' : 'Payment Done'}</span>
                                     <CheckCircle2 size={16} className="text-emerald-400" />
                                 </div>
                                 <p className="text-2xl font-black text-emerald-400 mt-3">₹{billsSummary.totalCollected?.toLocaleString()}</p>
@@ -510,7 +565,13 @@ export default function AdminPortal() {
                             </div>
 
                             {/* Total Outstanding (UNPAID) */}
-                            <div className="bg-panel border border-amber-500/30 p-5 rounded-2xl flex flex-col justify-between">
+                            <div 
+                                onClick={() => setBillStatusFilter('UNPAID')}
+                                className={`bg-panel border p-5 rounded-2xl flex flex-col justify-between cursor-pointer transition-all hover:scale-[1.02] shadow-sm ${
+                                    billStatusFilter === 'UNPAID' ? 'border-amber-500 ring-2 ring-amber-500/40 bg-amber-500/10' : 'border-amber-500/30 hover:border-amber-500/60'
+                                }`}
+                                title="Click to filter Unpaid bills"
+                            >
                                 <div className="flex justify-between items-center text-xs font-bold uppercase text-amber-400">
                                     <span>{language === 'ta' ? 'நிலுவை தொகை (Unpaid)' : 'Total Outstanding'}</span>
                                     <Clock size={16} className="text-amber-400" />
@@ -520,9 +581,15 @@ export default function AdminPortal() {
                             </div>
 
                             {/* Fines Imposed (OVERDUE) */}
-                            <div className="bg-panel border border-red-500/40 p-5 rounded-2xl flex flex-col justify-between">
+                            <div 
+                                onClick={() => setBillStatusFilter('OVERDUE')}
+                                className={`bg-panel border p-5 rounded-2xl flex flex-col justify-between cursor-pointer transition-all hover:scale-[1.02] shadow-sm ${
+                                    billStatusFilter === 'OVERDUE' ? 'border-red-500 ring-2 ring-red-500/40 bg-red-500/10' : 'border-red-500/40 hover:border-red-500/70'
+                                }`}
+                                title="Click to filter Overdue consumers"
+                            >
                                 <div className="flex justify-between items-center text-xs font-bold uppercase text-red-400">
-                                    <span>{language === 'ta' ? 'விதிக்கப்பட்ட அபராதம்' : 'Fines Imposed'}</span>
+                                    <span>{language === 'ta' ? 'விதிக்கப்பட்ட அபராதம்' : 'Overdue (Fines)'}</span>
                                     <ShieldAlert size={16} className="text-red-400" />
                                 </div>
                                 <p className="text-2xl font-black text-red-400 mt-3">₹{billsSummary.totalFines?.toLocaleString()}</p>
@@ -532,9 +599,15 @@ export default function AdminPortal() {
                             </div>
 
                             {/* Approaching Due Date */}
-                            <div className="bg-panel border border-yellow-500/30 p-5 rounded-2xl flex flex-col justify-between">
+                            <div 
+                                onClick={() => setBillStatusFilter('DUE_SOON')}
+                                className={`bg-panel border p-5 rounded-2xl flex flex-col justify-between cursor-pointer transition-all hover:scale-[1.02] shadow-sm ${
+                                    billStatusFilter === 'DUE_SOON' || billStatusFilter === 'DUE_REMINDER' ? 'border-yellow-500 ring-2 ring-yellow-500/40 bg-yellow-500/10' : 'border-yellow-500/30 hover:border-yellow-500/60'
+                                }`}
+                                title="Click to filter Due Date Reminder consumers"
+                            >
                                 <div className="flex justify-between items-center text-xs font-bold uppercase text-yellow-400">
-                                    <span>{language === 'ta' ? 'கடைசி நாள் நெருங்குபவை' : 'Due in ≤ 3 Days'}</span>
+                                    <span>{language === 'ta' ? 'கடைசி நாள் நினைவூட்டல்' : 'Due in ≤ 3 Days'}</span>
                                     <AlertTriangle size={16} className="text-yellow-400" />
                                 </div>
                                 <p className="text-2xl font-black text-yellow-400 mt-3">{billsSummary.nearingDueCount}</p>
@@ -582,13 +655,14 @@ export default function AdminPortal() {
                             <select
                                 value={billStatusFilter}
                                 onChange={(e) => setBillStatusFilter(e.target.value)}
-                                className="w-full sm:w-auto bg-dark border border-panelBorder text-white text-xs px-3 py-2.5 h-10 rounded-xl focus:border-gold-500 cursor-pointer"
+                                className="w-full sm:w-auto bg-dark border border-panelBorder text-white text-xs px-3 py-2.5 h-10 rounded-xl focus:border-gold-500 cursor-pointer font-medium"
                             >
-                                <option value="ALL">{language === 'ta' ? 'அனைத்து நிலை' : 'All Status'}</option>
+                                <option value="ALL">{language === 'ta' ? 'அனைத்து நிலை (All Status)' : 'All Status'}</option>
+                                <option value="PAID">{language === 'ta' ? 'கட்டணம் செலுத்தப்பட்டது (Payment Done)' : 'Payment Done (PAID)'}</option>
+                                <option value="OVERDUE">{language === 'ta' ? 'தாமதம் / அபராதம் (Overdue)' : 'Overdue (Fine Imposed)'}</option>
+                                <option value="DUE_SOON">{language === 'ta' ? 'கடைசி நாள் நினைவூட்டல் (Due in ≤ 3 Days)' : 'Due Date Reminder (≤ 3 Days)'}</option>
                                 <option value="PENDING_VERIFICATION">{language === 'ta' ? 'சரிபார்ப்பு நிலுவை (Pending Verification)' : 'Pending Verification'}</option>
-                                <option value="PAID">{language === 'ta' ? 'செலுத்தப்பட்டது (PAID)' : 'PAID'}</option>
-                                <option value="UNPAID">{language === 'ta' ? 'நிலுவை (UNPAID)' : 'UNPAID'}</option>
-                                <option value="OVERDUE">{language === 'ta' ? 'அபராதம் (OVERDUE)' : 'OVERDUE'}</option>
+                                <option value="UNPAID">{language === 'ta' ? 'நிலுவை (UNPAID)' : 'Unpaid'}</option>
                             </select>
 
                             <select
@@ -711,7 +785,7 @@ export default function AdminPortal() {
                                                         {b.status === 'PAID' ? (
                                                             <div>
                                                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 font-bold text-[10px] border border-emerald-500/30">
-                                                                    <CheckCircle2 size={12} /> {language === 'ta' ? 'செலுத்தப்பட்டது' : 'PAID'}
+                                                                    <CheckCircle2 size={12} /> {language === 'ta' ? 'கட்டணம் செலுத்தப்பட்டது' : 'PAYMENT DONE'}
                                                                 </span>
                                                                 {b.paidAt && (
                                                                     <p className="text-[9px] text-slate-500 mt-0.5">
@@ -744,12 +818,21 @@ export default function AdminPortal() {
                                                                     +{b.daysOverdue} {language === 'ta' ? 'நாட்கள் தாமதம்' : 'days overdue'}
                                                                 </p>
                                                             </div>
+                                                        ) : (b.isNearingDue || (b.daysRemaining >= 0 && b.daysRemaining <= 3)) ? (
+                                                            <div>
+                                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-yellow-500/15 text-yellow-400 font-bold text-[10px] border border-yellow-500/30 animate-pulse">
+                                                                    <AlertTriangle size={12} /> {language === 'ta' ? 'கடைசி நாள் நினைவூட்டல்' : 'DUE REMINDER'}
+                                                                </span>
+                                                                <p className="text-[9px] text-yellow-400 font-bold mt-0.5">
+                                                                    {b.daysRemaining} {language === 'ta' ? 'நாட்கள் உள்ளன' : 'days left'}
+                                                                </p>
+                                                            </div>
                                                         ) : (
                                                             <div>
                                                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-400 font-bold text-[10px] border border-amber-500/30">
                                                                     <Clock size={12} /> {language === 'ta' ? 'நிலுவை' : 'UNPAID'}
                                                                 </span>
-                                                                <p className={`text-[9px] mt-0.5 ${b.isNearingDue ? 'text-yellow-400 font-bold' : 'text-slate-400'}`}>
+                                                                <p className="text-[9px] text-slate-400 mt-0.5">
                                                                     {b.daysRemaining} {language === 'ta' ? 'நாட்கள் உள்ளன' : 'days left'}
                                                                 </p>
                                                             </div>
@@ -806,6 +889,27 @@ export default function AdminPortal() {
                                                                     </button>
                                                                 </>
                                                             ) : null}
+
+                                                            {/* Quick Demo Scenario Adjuster */}
+                                                            {b.status !== 'PAID' && (
+                                                                <select
+                                                                    defaultValue=""
+                                                                    onChange={(e) => {
+                                                                        if (e.target.value) {
+                                                                            handleAdjustBillDate(b._id, e.target.value);
+                                                                            e.target.value = '';
+                                                                        }
+                                                                    }}
+                                                                    className="px-2 py-1.5 rounded-lg bg-dark hover:bg-darker border border-gold-500/30 text-gold-400 text-xs font-semibold cursor-pointer outline-none shadow-sm"
+                                                                    title="Simulate due date & fine scenario for demo"
+                                                                >
+                                                                    <option value="" disabled>⚡ Demo</option>
+                                                                    <option value="OVERDUE">⚠️ Overdue (-5d + ₹150 Fine)</option>
+                                                                    <option value="NEARING_DUE">⏰ Due Soon (+2d Left)</option>
+                                                                    <option value="PENDING_VERIFICATION">📝 Submit Verification Ref</option>
+                                                                    <option value="NORMAL">✅ Normal (15d Grace)</option>
+                                                                </select>
+                                                            )}
 
                                                             <a
                                                                 href="https://www.tnebnet.org/awp/login"
@@ -965,13 +1069,50 @@ export default function AdminPortal() {
                                         </tr>
                                     ) : (
                                         filteredConsumers.map((c) => {
-                                            const docs = c.kycDocuments || c.user?.kycDocuments || [];
+                                            const docs = getConsumerDocs(c);
                                             const hasDocs = docs.length > 0;
                                             return (
                                                 <tr key={c._id} className="hover:bg-darker/40 transition">
                                                     <td className="p-4">
                                                         <p className="font-bold text-white text-sm">{c.user?.name || 'N/A'}</p>
                                                         <p className="text-slate-400 text-xs">{c.user?.email || 'N/A'}</p>
+                                                        {(() => {
+                                                            const cBill = bills.find(b => b.consumerId === c._id || b.userId === c.user?._id || b.userEmail === c.user?.email || b.serviceNumber === c.serviceNumber);
+                                                            if (!cBill) return null;
+                                                            if (cBill.status === 'PAID') {
+                                                                return (
+                                                                    <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                                                        <CheckCircle2 size={10} /> {language === 'ta' ? 'கட்டணம் செலுத்தப்பட்டது' : 'PAYMENT DONE'}
+                                                                    </span>
+                                                                );
+                                                            }
+                                                            if (cBill.status === 'OVERDUE') {
+                                                                return (
+                                                                    <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/15 text-red-400 border border-red-500/30">
+                                                                        <ShieldAlert size={10} /> {language === 'ta' ? 'அபராதம் / தாமதம்' : 'OVERDUE'} (+₹{cBill.fineAmount || 150})
+                                                                    </span>
+                                                                );
+                                                            }
+                                                            if (cBill.isNearingDue || (cBill.daysRemaining >= 0 && cBill.daysRemaining <= 3)) {
+                                                                return (
+                                                                    <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 animate-pulse">
+                                                                        <AlertTriangle size={10} /> {language === 'ta' ? 'கடைசி நாள் நினைவூட்டல்' : 'DUE REMINDER'} ({cBill.daysRemaining}d)
+                                                                    </span>
+                                                                );
+                                                            }
+                                                            if (cBill.status === 'PENDING_VERIFICATION') {
+                                                                return (
+                                                                    <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
+                                                                        <Clock size={10} /> {language === 'ta' ? 'சரிபார்ப்பு நிலுவை' : 'PENDING CHECK'}
+                                                                    </span>
+                                                                );
+                                                            }
+                                                            return (
+                                                                <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                                                    <Clock size={10} /> {language === 'ta' ? 'நிலுவை' : 'UNPAID'} ({cBill.daysRemaining}d)
+                                                                </span>
+                                                            );
+                                                        })()}
                                                     </td>
                                                     <td className="p-4 font-mono font-bold text-gold-400">
                                                         {c.serviceNumber}
@@ -1422,29 +1563,119 @@ export default function AdminPortal() {
                                 </div>
                             </div>
 
-                            {/* Documents list */}
-                            <div className="space-y-2">
-                                <h4 className="text-xs font-bold uppercase text-slate-400">{t('admin.documents')}</h4>
-                                {(selectedConsumer.kycDocuments || selectedConsumer.user?.kycDocuments || []).length === 0 ? (
-                                    <p className="text-xs text-slate-500 italic p-4 bg-dark rounded-xl text-center">
-                                        {language === 'ta' ? 'பதிவேற்றப்பட்ட ஆவணங்கள் எதுவும் இல்லை.' : 'No identity/property tax proof documents uploaded yet.'}
-                                    </p>
-                                ) : (
-                                    (selectedConsumer.kycDocuments || selectedConsumer.user?.kycDocuments || []).map((doc, idx) => (
-                                        <div key={idx} className="p-3 rounded-xl bg-dark border border-panelBorder flex justify-between items-center text-xs">
-                                            <span className="font-mono text-slate-300 truncate max-w-xs">{doc}</span>
-                                            <a
-                                                href={`http://127.0.0.1:5000${doc}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-gold-400 hover:text-gold-300 font-bold flex items-center gap-1"
-                                            >
-                                                <span>View</span>
-                                                <ExternalLink size={12} />
-                                            </a>
-                                        </div>
-                                    ))
-                                )}
+                            {/* Documents list & In-modal Inspector */}
+                            <div className="space-y-3">
+                                {(() => {
+                                    const docs = getConsumerDocs(selectedConsumer);
+                                    const safeDocIndex = selectedDocIndex < docs.length ? selectedDocIndex : 0;
+                                    const activeDoc = docs[safeDocIndex] || docs[0];
+                                    const fullUrl = activeDoc ? getDocUrl(activeDoc) : '';
+                                    const isPdf = activeDoc ? (activeDoc.toLowerCase().includes('.pdf') || !activeDoc.match(/\.(jpeg|jpg|png|webp)$/i)) : false;
+
+                                    return (
+                                        <>
+                                            <div className="flex items-center justify-between">
+                                                <h4 className="text-xs font-bold uppercase text-slate-400">{t('admin.documents')}</h4>
+                                                <span className="text-[11px] text-slate-400 font-mono">
+                                                    {docs.length} {language === 'ta' ? 'ஆவணங்கள் பதிவேற்றப்பட்டுள்ளது' : 'file(s) attached'}
+                                                </span>
+                                            </div>
+
+                                            {docs.length === 0 ? (
+                                                <p className="text-xs text-slate-500 italic p-4 bg-dark rounded-xl text-center">
+                                                    {language === 'ta' ? 'பதிவேற்றப்பட்ட ஆவணங்கள் எதுவும் இல்லை.' : 'No identity/property tax proof documents uploaded yet.'}
+                                                </p>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    {/* Document tabs / selector */}
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {docs.map((doc, idx) => {
+                                                            const fileName = doc.split('/').pop() || `Doc #${idx + 1}`;
+                                                            const isSelected = safeDocIndex === idx;
+                                                            const fileIsPdf = doc.toLowerCase().includes('.pdf');
+
+                                                            return (
+                                                                <button
+                                                                    key={`${doc}-${idx}`}
+                                                                    type="button"
+                                                                    onClick={() => setSelectedDocIndex(idx)}
+                                                                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                                                                        isSelected
+                                                                            ? 'bg-gold-500 text-darker shadow-md ring-2 ring-gold-400/50'
+                                                                            : 'bg-dark text-slate-300 hover:text-white border border-panelBorder hover:border-gold-500/40'
+                                                                    }`}
+                                                                >
+                                                                    <FileText size={13} className={isSelected ? 'text-darker' : 'text-gold-400'} />
+                                                                    <span>Doc #{idx + 1}</span>
+                                                                    <span className={`text-[9px] px-1.5 py-0.2 rounded uppercase ${isSelected ? 'bg-darker/30 text-darker font-black' : 'bg-darker text-slate-400'}`}>
+                                                                        {fileIsPdf ? 'PDF' : 'IMG'}
+                                                                    </span>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+
+                                                    {/* Active Document Viewer */}
+                                                    {activeDoc && (
+                                                        <div 
+                                                            key={`${selectedConsumer._id}-${safeDocIndex}-${activeDoc}`}
+                                                            className="rounded-xl border border-panelBorder bg-darker overflow-hidden shadow-inner"
+                                                        >
+                                                            <div className="p-2.5 bg-dark border-b border-panelBorder flex justify-between items-center text-xs">
+                                                                <div className="flex items-center gap-2 truncate max-w-sm">
+                                                                    <span className="font-mono text-slate-300 truncate font-semibold">
+                                                                        {activeDoc.split('/').pop()}
+                                                                    </span>
+                                                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-panel border border-panelBorder text-gold-400">
+                                                                        {isPdf ? 'PDF Document' : 'Image Photo'}
+                                                                    </span>
+                                                                </div>
+                                                                <a
+                                                                    href={fullUrl}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="text-gold-400 hover:text-gold-300 font-bold flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gold-500/10 border border-gold-500/20 transition hover:bg-gold-500/20"
+                                                                >
+                                                                    <span>{language === 'ta' ? 'புதிய சாளரத்தில் திற' : 'Open in New Tab'}</span>
+                                                                    <ExternalLink size={12} />
+                                                                </a>
+                                                            </div>
+
+                                                            <div className="h-[420px] w-full bg-slate-950/80 flex items-center justify-center relative p-1">
+                                                                {isPdf ? (
+                                                                    <object
+                                                                        data={`${fullUrl}#toolbar=1&navpanes=0`}
+                                                                        type="application/pdf"
+                                                                        className="w-full h-full rounded-b-xl border-0"
+                                                                    >
+                                                                        <iframe
+                                                                            src={`${fullUrl}#toolbar=1`}
+                                                                            title="KYC Document Preview"
+                                                                            className="w-full h-full border-0 rounded-b-xl"
+                                                                        >
+                                                                            <p className="p-4 text-center text-xs text-slate-400">
+                                                                                Preview unavailable inside iframe.{' '}
+                                                                                <a href={fullUrl} target="_blank" rel="noreferrer" className="text-gold-400 underline">
+                                                                                    Click here to open PDF directly
+                                                                                </a>
+                                                                            </p>
+                                                                        </iframe>
+                                                                    </object>
+                                                                ) : (
+                                                                    <img
+                                                                        src={fullUrl}
+                                                                        alt="KYC Document"
+                                                                        className="max-h-full max-w-full object-contain rounded-lg p-2"
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
                             </div>
                         </div>
 

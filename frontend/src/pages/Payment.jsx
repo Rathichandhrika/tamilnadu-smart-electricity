@@ -306,44 +306,55 @@ export default function Payment() {
                             const dueDateObj = new Date(bill.dueDate);
                             const createdDateObj = new Date(bill.createdAt || bill.generatedAt || Date.now());
                             const diffDays = Math.ceil((dueDateObj - now) / (1000 * 60 * 60 * 24));
-                            const isOverdue = diffDays < 0;
-                            const isNearingDue = diffDays >= 0 && diffDays <= 3;
+                            const isPendingVerification = bill.status === 'PENDING_VERIFICATION' || bill.paymentVerificationStatus === 'PENDING';
+                            const isOverdue = !isPendingVerification && diffDays < 0;
+                            const isNearingDue = !isPendingVerification && diffDays >= 0 && diffDays <= 3;
                             const totalWithFine = Number(((bill.totalAmount || 0) + (bill.fineAmount || 0)).toFixed(2));
 
                             return (
                                 <div
                                     key={bill._id}
                                     className={`bg-panel rounded-2xl p-6 border shadow-xl transition space-y-5 ${
-                                        isOverdue
-                                            ? 'border-rose-500/50 ring-1 ring-rose-500/30'
-                                            : isNearingDue
-                                                ? 'border-amber-500/50 ring-1 ring-amber-500/30'
-                                                : 'border-panelBorder'
+                                        isPendingVerification
+                                            ? 'border-cyan-500/50 ring-1 ring-cyan-500/30'
+                                            : isOverdue
+                                                ? 'border-rose-500/50 ring-1 ring-rose-500/30'
+                                                : isNearingDue
+                                                    ? 'border-amber-500/50 ring-1 ring-amber-500/30'
+                                                    : 'border-panelBorder'
                                     }`}
                                 >
                                     {/* Card Header */}
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-panelBorder pb-4">
                                         <div className="flex items-start gap-3">
                                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                                                isOverdue ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30' : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                                                isPendingVerification
+                                                    ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
+                                                    : isOverdue 
+                                                        ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30' 
+                                                        : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                                             }`}>
-                                                {isOverdue ? <ShieldAlert size={20} /> : <Clock size={20} />}
+                                                {isPendingVerification ? <Clock size={20} className="animate-spin" /> : isOverdue ? <ShieldAlert size={20} /> : <Clock size={20} />}
                                             </div>
                                             <div>
                                                 <div className="flex items-center gap-2">
                                                     <h3 className="text-base font-black text-white">{bill.billingMonth}</h3>
-                                                    <span className={`text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded border ${
-                                                        isOverdue
-                                                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                                                            : isNearingDue
-                                                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
-                                                                : 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30'
+                                                    <span className={`text-[10px] uppercase font-mono font-bold px-2.5 py-0.5 rounded border ${
+                                                        isPendingVerification
+                                                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 animate-pulse'
+                                                            : isOverdue
+                                                                ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                                                                : isNearingDue
+                                                                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+                                                                    : 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30'
                                                     }`}>
-                                                        {isOverdue
-                                                            ? (language === 'ta' ? `தாமதம் (+${Math.abs(diffDays)} நாட்கள்)` : `OVERDUE (+${Math.abs(diffDays)}d)`)
-                                                            : isNearingDue
-                                                                ? (language === 'ta' ? `கடைசி நாள் நெருங்குகிறது (${diffDays} நாட்கள்)` : `DUE IN ${diffDays} DAYS`)
-                                                                : (language === 'ta' ? `${diffDays} நாட்கள் உள்ளன` : `${diffDays} DAYS LEFT`)}
+                                                        {isPendingVerification
+                                                            ? (language === 'ta' ? 'சரிபார்ப்பு நிலுவையில் (Pending Admin Check)' : 'VERIFICATION PENDING')
+                                                            : isOverdue
+                                                                ? (language === 'ta' ? `தாமதம் (+${Math.abs(diffDays)} நாட்கள்)` : `OVERDUE (+${Math.abs(diffDays)}d)`)
+                                                                : isNearingDue
+                                                                    ? (language === 'ta' ? `கடைசி நாள் நெருங்குகிறது (${diffDays} நாட்கள்)` : `DUE IN ${diffDays} DAYS`)
+                                                                    : (language === 'ta' ? `${diffDays} நாட்கள் உள்ளன` : `${diffDays} DAYS LEFT`)}
                                                     </span>
                                                 </div>
                                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 mt-1">
@@ -395,40 +406,72 @@ export default function Payment() {
                                     {/* Action Row */}
                                     <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
                                         <div className="flex items-center gap-2 text-xs text-slate-400">
-                                            <HelpCircle size={14} className="text-gold-500 shrink-0" />
-                                            <span>
-                                                {language === 'ta'
-                                                    ? 'TANGEDCO தளத்தில் கட்டிய பின் கீழே உள்ள உறுதிப்படுத்தல் பொத்தானை அழுத்தவும்.'
-                                                    : 'After settling on TANGEDCO portal, click below to record your payment reference.'}
-                                            </span>
+                                            {isPendingVerification ? (
+                                                <div className="flex items-center gap-2 text-cyan-300 font-medium">
+                                                    <CheckCircle2 size={15} className="text-cyan-400" />
+                                                    <span>
+                                                        {language === 'ta'
+                                                            ? `கட்டண ரசீது எண் ${bill.transactionRef || 'TNEB-QPAY'} சமர்ப்பிக்கப்பட்டது. நிர்வாகியின் சரிபார்ப்பு நிலுவையில் உள்ளது.`
+                                                            : `Payment Ref ${bill.transactionRef || 'TNEB-QPAY'} recorded. Awaiting admin ledger confirmation.`}
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <HelpCircle size={14} className="text-gold-500 shrink-0" />
+                                                    <span>
+                                                        {language === 'ta'
+                                                            ? 'TANGEDCO தளத்தில் கட்டிய பின் கீழே உள்ள உறுதிப்படுத்தல் பொத்தானை அழுத்தவும்.'
+                                                            : 'After settling on TANGEDCO portal, click below to record your payment reference.'}
+                                                    </span>
+                                                </>
+                                            )}
                                         </div>
 
                                         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                                            {/* Primary Redirection Button */}
-                                            <button
-                                                type="button"
-                                                onClick={() => handleRedirectToTangedco(bill)}
-                                                className="flex-1 sm:flex-initial py-2.5 px-5 bg-gold-500 hover:bg-gold-400 text-darker font-extrabold text-xs uppercase tracking-wider rounded-xl transition cursor-pointer shadow-lg shadow-gold-500/20 flex items-center justify-center gap-2"
-                                            >
-                                                <Zap size={15} className="fill-darker" />
-                                                <span>{language === 'ta' ? 'TANGEDCO தளத்தில் செலுத்துக' : 'Pay via TANGEDCO'}</span>
-                                                <ExternalLink size={13} />
-                                            </button>
+                                            {isPendingVerification ? (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="px-3 py-2 bg-cyan-500/15 border border-cyan-500/30 rounded-xl text-cyan-300 font-mono text-xs font-bold">
+                                                        Ref: {bill.transactionRef}
+                                                    </span>
+                                                    <a
+                                                        href="https://www.tnebnet.org/awp/login"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="py-2 px-3 bg-dark hover:bg-darker border border-panelBorder text-slate-300 text-xs font-bold rounded-xl flex items-center gap-1.5"
+                                                    >
+                                                        <span>{language === 'ta' ? 'TANGEDCO தளம்' : 'TANGEDCO Portal'}</span>
+                                                        <ExternalLink size={12} />
+                                                    </a>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    {/* Primary Redirection Button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRedirectToTangedco(bill)}
+                                                        className="flex-1 sm:flex-initial py-2.5 px-5 bg-gold-500 hover:bg-gold-400 text-darker font-extrabold text-xs uppercase tracking-wider rounded-xl transition cursor-pointer shadow-lg shadow-gold-500/20 flex items-center justify-center gap-2"
+                                                    >
+                                                        <Zap size={15} className="fill-darker" />
+                                                        <span>{language === 'ta' ? 'TANGEDCO தளத்தில் செலுத்துக' : 'Pay via TANGEDCO'}</span>
+                                                        <ExternalLink size={13} />
+                                                    </button>
 
-                                            {/* Post-Payment Submission Button */}
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setSelectedBillForConfirmation(bill);
-                                                    setTnebTxnRef('');
-                                                    setConfirmationError('');
-                                                    setConfirmationSuccess('');
-                                                }}
-                                                className="flex-1 sm:flex-initial py-2.5 px-4 bg-dark hover:bg-darker border border-emerald-500/40 text-emerald-300 hover:text-emerald-200 font-bold text-xs uppercase tracking-wider rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5"
-                                            >
-                                                <CheckCircle2 size={14} />
-                                                <span>{language === 'ta' ? 'செலுத்தியதை உறுதிப்படுத்துக' : 'Confirm Payment Reference'}</span>
-                                            </button>
+                                                    {/* Post-Payment Submission Button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSelectedBillForConfirmation(bill);
+                                                            setTnebTxnRef('');
+                                                            setConfirmationError('');
+                                                            setConfirmationSuccess('');
+                                                        }}
+                                                        className="flex-1 sm:flex-initial py-2.5 px-4 bg-dark hover:bg-darker border border-emerald-500/40 text-emerald-300 hover:text-emerald-200 font-bold text-xs uppercase tracking-wider rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5"
+                                                    >
+                                                        <CheckCircle2 size={14} />
+                                                        <span>{language === 'ta' ? 'செலுத்தியதை உறுதிப்படுத்துக' : 'Confirm Payment Reference'}</span>
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

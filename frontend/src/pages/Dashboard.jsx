@@ -173,7 +173,9 @@ export default function Dashboard() {
                 if (setUser) {
                     setUser(prev => ({
                         ...prev,
-                        kycDocuments: (prev?.kycDocuments || []).filter(d => d !== docPath)
+                        kycDocuments: data.data?.kycDocuments !== undefined
+                            ? data.data.kycDocuments
+                            : (prev?.kycDocuments || []).filter(d => d !== docPath)
                     }));
                 }
             }

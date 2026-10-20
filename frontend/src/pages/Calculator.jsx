@@ -82,6 +82,7 @@ export default function Calculator() {
     const [genLoading, setGenLoading] = useState(false);
     const [genError, setGenError] = useState('');
     const [selectedPayBill, setSelectedPayBill] = useState(null);
+    const [demoScenario, setDemoScenario] = useState('NORMAL'); // 'NORMAL' | 'OVERDUE' | 'NEARING_DUE' | 'PENDING_VERIFICATION'
 
     // Calculate Units from physical readings
     const computedUnits = Math.max(0, (Number(currReading) || 0) - (Number(prevReading) || 0));
@@ -142,7 +143,8 @@ export default function Calculator() {
             const { data } = await api.post('/bills', {
                 unitsConsumed: unitsToBill,
                 billingMonth: billingMonth,
-                connectionType: genConnectionType
+                connectionType: genConnectionType,
+                demoScenario: demoScenario
             });
 
             if (data.success) {
@@ -659,6 +661,52 @@ export default function Calculator() {
                                     </div>
                                 </div>
                             )}
+
+                            {/* Demo Mode / Due Date Timing Selector */}
+                            <div className="p-4 rounded-xl bg-darker border border-panelBorder space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-gold-400 flex items-center gap-1.5">
+                                        <Sparkles size={14} className="text-gold-400" />
+                                        <span>{language === 'ta' ? 'மாதிரி செய்முறை / காலக்கெடு (Demo Due Date Scenario)' : 'Demo Due Date & Payment Timing Scenario'}</span>
+                                    </label>
+                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gold-500/15 text-gold-400 border border-gold-500/30 font-bold">
+                                        DEMO TESTING
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                    <label className={`p-3 rounded-xl border cursor-pointer flex items-start gap-2.5 transition ${demoScenario === 'NORMAL' ? 'bg-panel border-gold-500 text-white shadow-sm ring-1 ring-gold-500/30' : 'bg-dark border-panelBorder text-slate-400 hover:text-white'}`}>
+                                        <input type="radio" name="demoScenario" value="NORMAL" checked={demoScenario === 'NORMAL'} onChange={() => setDemoScenario('NORMAL')} className="mt-0.5 text-gold-500" />
+                                        <div>
+                                            <p className="font-bold text-slate-200">{language === 'ta' ? 'சாதாரண பில் (15 நாட்கள் கால அவகாசம்)' : 'Standard Grace Period (15 Days)'}</p>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">{language === 'ta' ? 'அபராதம் இன்றி இயல்பான செலுத்தும் தேதி' : 'Standard invoice with no fines or warnings'}</p>
+                                        </div>
+                                    </label>
+
+                                    <label className={`p-3 rounded-xl border cursor-pointer flex items-start gap-2.5 transition ${demoScenario === 'OVERDUE' ? 'bg-rose-500/10 border-rose-500 text-rose-300 shadow-sm ring-1 ring-rose-500/30' : 'bg-dark border-panelBorder text-slate-400 hover:text-white'}`}>
+                                        <input type="radio" name="demoScenario" value="OVERDUE" checked={demoScenario === 'OVERDUE'} onChange={() => setDemoScenario('OVERDUE')} className="mt-0.5 text-rose-500" />
+                                        <div>
+                                            <p className="font-bold text-rose-400">{language === 'ta' ? 'காலாவதியான பில் (-5 நாட்கள் + ₹150 அபராதம்)' : 'Overdue (-5 Days + ₹150 LPSC Fine)'}</p>
+                                            <p className="text-[10px] text-rose-300/80 mt-0.5">{language === 'ta' ? 'அபராதக் கட்டணம் & துண்டிப்பு எச்சரிக்கை அறிவிப்பு' : 'Late payment surcharge & urgent disconnection alert'}</p>
+                                        </div>
+                                    </label>
+
+                                    <label className={`p-3 rounded-xl border cursor-pointer flex items-start gap-2.5 transition ${demoScenario === 'NEARING_DUE' ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-sm ring-1 ring-amber-500/30' : 'bg-dark border-panelBorder text-slate-400 hover:text-white'}`}>
+                                        <input type="radio" name="demoScenario" value="NEARING_DUE" checked={demoScenario === 'NEARING_DUE'} onChange={() => setDemoScenario('NEARING_DUE')} className="mt-0.5 text-amber-500" />
+                                        <div>
+                                            <p className="font-bold text-amber-400">{language === 'ta' ? 'கடைசி தேதி நெருங்குகிறது (+2 நாட்கள் மீதம்)' : 'Approaching Deadline (2 Days Left)'}</p>
+                                            <p className="text-[10px] text-amber-300/80 mt-0.5">{language === 'ta' ? 'கட்டண நினைவூட்டல் அறிவிப்புடன் (Due Reminder Alert)' : 'Upcoming deadline warning notification'}</p>
+                                        </div>
+                                    </label>
+
+                                    <label className={`p-3 rounded-xl border cursor-pointer flex items-start gap-2.5 transition ${demoScenario === 'PENDING_VERIFICATION' ? 'bg-cyan-500/10 border-cyan-500 text-cyan-300 shadow-sm ring-1 ring-cyan-500/30' : 'bg-dark border-panelBorder text-slate-400 hover:text-white'}`}>
+                                        <input type="radio" name="demoScenario" value="PENDING_VERIFICATION" checked={demoScenario === 'PENDING_VERIFICATION'} onChange={() => setDemoScenario('PENDING_VERIFICATION')} className="mt-0.5 text-cyan-500" />
+                                        <div>
+                                            <p className="font-bold text-cyan-400">{language === 'ta' ? 'சரிபார்ப்பு நிலுவை (QuickPay ரசீது எண்)' : 'Pending Verification (Submitted Ref)'}</p>
+                                            <p className="text-[10px] text-cyan-300/80 mt-0.5">{language === 'ta' ? 'நிர்வாகியின் ஒப்புதலுக்காகக் காத்திருக்கிறது' : 'Ready for Admin ledger verification'}</p>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
 
                             {genError && (
                                 <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-xl">

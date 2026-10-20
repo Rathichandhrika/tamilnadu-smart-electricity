@@ -5,7 +5,8 @@ const {
     saveGeneratedBill, 
     getMyBills,
     getTariffRules,
-    payBill
+    payBill,
+    adjustBillDueDate
 } = require('../controllers/billController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -14,5 +15,6 @@ router.post('/calculate', protect, calculateBillEstimate);
 router.post('/', protect, saveGeneratedBill);
 router.get('/history', protect, getMyBills);
 router.post('/:id/pay', protect, payBill);
+router.put('/:id/adjust-date', protect, adjustBillDueDate);
 
 module.exports = router;

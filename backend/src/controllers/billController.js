@@ -166,7 +166,14 @@ const calculateBillEstimate = async (req, res, next) => {
 // @access  Private (System/Admin usually, opened for demo)
 const saveGeneratedBill = async (req, res, next) => {
     try {
-        const { unitsConsumed, billingMonth, connectionType: explicitType } = req.body;
+        const { 
+            unitsConsumed, 
+            billingMonth, 
+            connectionType: explicitType,
+            demoScenario,
+            dueDateOffsetDays,
+            customDueDate
+        } = req.body;
 
         const consumer = await Consumer.findOne({ user: req.user._id });
         if (!consumer) {
@@ -174,6 +181,7 @@ const saveGeneratedBill = async (req, res, next) => {
         }
 
         // 1. Enforce strict e-KYC requirement for official invoice generation
+        const User = require('../models/User');
         const user = await User.findById(req.user._id);
         const isKycApproved = (consumer.verificationStatus === 'APPROVED' || user?.verificationStatus === 'APPROVED');
         if (!isKycApproved) {
@@ -202,9 +210,52 @@ const saveGeneratedBill = async (req, res, next) => {
             billDetails.electricityTax = 0;
         }
 
-        // 2. Set strict statutory due date: exactly 15 days from invoice generation
-        const dueDate = new Date();
-        dueDate.setDate(dueDate.getDate() + 15);
+        // 2. Due Date Calculation & Demo Scenario Logic
+        let dueDate;
+        let billStatus = 'UNPAID';
+        let fineAmount = 0;
+        let fineImposed = false;
+        let fineReason = '';
+        let fineImposedAt = null;
+        let paymentVerificationStatus = 'NONE';
+        let transactionRef = null;
+        let paymentMode = null;
+        let submittedAt = null;
+        let dueAlertSent = false;
+        let fineAlertSent = false;
+
+        const isOverdueDemo = demoScenario === 'OVERDUE' || (typeof dueDateOffsetDays === 'number' && dueDateOffsetDays < 0);
+        const isNearingDueDemo = demoScenario === 'NEARING_DUE' || (typeof dueDateOffsetDays === 'number' && dueDateOffsetDays >= 0 && dueDateOffsetDays <= 3);
+        const isVerificationDemo = demoScenario === 'PENDING_VERIFICATION';
+
+        if (customDueDate) {
+            dueDate = new Date(customDueDate);
+        } else if (isOverdueDemo) {
+            const offset = typeof dueDateOffsetDays === 'number' ? dueDateOffsetDays : -5;
+            dueDate = new Date(Date.now() + offset * 24 * 60 * 60 * 1000);
+            billStatus = 'OVERDUE';
+            fineAmount = Math.max(150, Number((billDetails.totalAmount * 0.015).toFixed(2)));
+            fineImposed = true;
+            fineImposedAt = new Date();
+            fineReason = 'TANGEDCO Late Payment Surcharge (LPSC) for crossing statutory due date';
+            dueAlertSent = true;
+            fineAlertSent = true;
+        } else if (isNearingDueDemo) {
+            const offset = typeof dueDateOffsetDays === 'number' ? dueDateOffsetDays : 2;
+            dueDate = new Date(Date.now() + offset * 24 * 60 * 60 * 1000);
+            billStatus = 'UNPAID';
+            dueAlertSent = true;
+        } else if (isVerificationDemo) {
+            dueDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000);
+            billStatus = 'PENDING_VERIFICATION';
+            paymentVerificationStatus = 'PENDING';
+            paymentMode = 'TANGEDCO_QUICKPAY';
+            transactionRef = `TNEB-QPAY-${Date.now().toString().slice(-8)}`;
+            submittedAt = new Date();
+        } else {
+            dueDate = new Date();
+            dueDate.setDate(dueDate.getDate() + 15);
+        }
 
         // Save to Database
         const savedBill = await Bill.create({
@@ -217,6 +268,17 @@ const saveGeneratedBill = async (req, res, next) => {
             electricityTax: billDetails.electricityTax || 0,
             totalAmount: billDetails.totalAmount,
             dueDate: dueDate,
+            status: billStatus,
+            fineAmount: fineAmount,
+            fineImposed: fineImposed,
+            fineReason: fineReason,
+            fineImposedAt: fineImposedAt,
+            paymentVerificationStatus: paymentVerificationStatus,
+            transactionRef: transactionRef,
+            paymentMode: paymentMode,
+            submittedAt: submittedAt,
+            dueAlertSent: dueAlertSent,
+            fineAlertSent: fineAlertSent,
             slabBreakdown: billDetails.slabBreakdown
         });
 
@@ -226,19 +288,60 @@ const saveGeneratedBill = async (req, res, next) => {
             year: 'numeric'
         });
 
-        // 3. Create In-App Notification with 15-day payment window and ₹150 fine warning
-        await Alert.create({
-            type: 'INVOICE_GENERATED',
-            severity: 'MEDIUM',
-            title: 'Official Electricity Invoice Generated',
-            titleTa: 'அதிகாரப்பூர்வ மின்கட்டண விலைப்பட்டியல் வெளியீடு',
-            message: `Official Invoice for ${savedBill.billingMonth} has been generated: ₹${savedBill.totalAmount.toLocaleString()} (${savedBill.unitsConsumed} kWh). You have 15 days to pay (Due Date: ${dueDateFormatted}). Clear before due date to avoid a late fee surcharge of ₹150.`,
-            messageTa: `${savedBill.billingMonth} மாதத்திற்கான அதிகாரப்பூர்வ மின்கட்டண விலைப்பட்டியல் உருவாக்கப்பட்டது: ₹${savedBill.totalAmount.toLocaleString()} (${savedBill.unitsConsumed} kWh). கட்டணம் செலுத்த 15 நாட்கள் கால அவகாசம் உள்ளது (கடைசி நாள்: ${dueDateFormatted}). ₹150 அபராதக் கட்டணத்தைத் தவிர்க்க கடைசி நாளுக்குள் செலுத்தவும்.`,
-            consumer: consumer._id,
-            user: req.user._id,
-            bill: savedBill._id,
-            fineAmount: 0
-        });
+        // 3. Create Corresponding In-App Notification
+        if (isOverdueDemo) {
+            await Alert.create({
+                type: 'FINE_IMPOSED',
+                severity: 'HIGH',
+                title: 'TANGEDCO Late Payment Surcharge (LPSC) Imposed',
+                titleTa: 'தாமத அபராதக் கட்டணம் (LPSC) விதிக்கப்பட்டது',
+                message: `Statutory Warning: Your electricity bill of ₹${savedBill.totalAmount.toLocaleString()} for ${savedBill.billingMonth} is overdue (Due Date was: ${dueDateFormatted}). A late fee surcharge of ₹${fineAmount} has been applied. Total Payable: ₹${(savedBill.totalAmount + fineAmount).toLocaleString()}. Please settle immediately via TANGEDCO Quick Pay to avoid supply disconnection.`,
+                messageTa: `அறிவிப்பு: உங்கள் ${savedBill.billingMonth} மாத மின்கட்டணம் ₹${savedBill.totalAmount.toLocaleString()} நிலுவைத் தேதியைத் (${dueDateFormatted}) தாண்டிவிட்டதால் ₹${fineAmount} அபராதக் கட்டணம் விதிக்கப்பட்டுள்ளது. மொத்தத் தொகை: ₹${(savedBill.totalAmount + fineAmount).toLocaleString()}. உடனே செலுத்தவும்.`,
+                consumer: consumer._id,
+                user: req.user._id,
+                bill: savedBill._id,
+                fineAmount: fineAmount
+            });
+        } else if (isNearingDueDemo) {
+            await Alert.create({
+                type: 'DUE_DATE_NEAR',
+                severity: 'HIGH',
+                title: 'TANGEDCO Due Date Alert (≤ 3 Days Remaining)',
+                titleTa: 'கட்டணக் கடைசி நாள் எச்சரிக்கை (3 நாட்களுக்குள்)',
+                message: `Statutory Warning: Your electricity bill of ₹${savedBill.totalAmount.toLocaleString()} for ${savedBill.billingMonth} is due soon (Due Date: ${dueDateFormatted}). Clear before due date to avoid a late fee surcharge of ₹150.`,
+                messageTa: `அறிவிப்பு: உங்கள் ${savedBill.billingMonth} மாத மின்கட்டணம் ₹${savedBill.totalAmount.toLocaleString()} செலுத்தக் கடைசி நாள்: ${dueDateFormatted}. ₹150 அபராதத்தைத் தவிர்க்க கடைசி நாளுக்குள் செலுத்தவும்.`,
+                consumer: consumer._id,
+                user: req.user._id,
+                bill: savedBill._id,
+                fineAmount: 150
+            });
+        } else if (isVerificationDemo) {
+            const totalPayable = savedBill.totalAmount + (savedBill.fineAmount || 0);
+            await Alert.create({
+                type: 'PAYMENT_SUCCESS',
+                severity: 'MEDIUM',
+                title: 'TANGEDCO Payment Reference Submitted',
+                titleTa: 'கட்டண ரசீது எண் சரிபார்ப்புக்கு சமர்ப்பிக்கப்பட்டது',
+                message: `Payment reference ${transactionRef} submitted for ₹${totalPayable.toLocaleString()} (${savedBill.billingMonth}). Pending administrative ledger verification.`,
+                messageTa: `${savedBill.billingMonth} மாதத்திற்கான மின்கட்டண ரசீது எண் ${transactionRef} (₹${totalPayable.toLocaleString()}) சரிபார்ப்புக்கு சமர்ப்பிக்கப்பட்டுள்ளது.`,
+                consumer: consumer._id,
+                user: req.user._id,
+                bill: savedBill._id
+            });
+        } else {
+            await Alert.create({
+                type: 'INVOICE_GENERATED',
+                severity: 'MEDIUM',
+                title: 'Official Electricity Invoice Generated',
+                titleTa: 'அதிகாரப்பூர்வ மின்கட்டண விலைப்பட்டியல் வெளியீடு',
+                message: `Official Invoice for ${savedBill.billingMonth} has been generated: ₹${savedBill.totalAmount.toLocaleString()} (${savedBill.unitsConsumed} kWh). You have 15 days to pay (Due Date: ${dueDateFormatted}). Clear before due date to avoid a late fee surcharge of ₹150.`,
+                messageTa: `${savedBill.billingMonth} மாதத்திற்கான அதிகாரப்பூர்வ மின்கட்டண விலைப்பட்டியல் உருவாக்கப்பட்டது: ₹${savedBill.totalAmount.toLocaleString()} (${savedBill.unitsConsumed} kWh). கட்டணம் செலுத்த 15 நாட்கள் கால அவகாசம் உள்ளது (கடைசி நாள்: ${dueDateFormatted}). ₹150 அபராதக் கட்டணத்தைத் தவிர்க்க கடைசி நாளுக்குள் செலுத்தவும்.`,
+                consumer: consumer._id,
+                user: req.user._id,
+                bill: savedBill._id,
+                fineAmount: 0
+            });
+        }
 
         res.status(201).json({ success: true, data: savedBill });
     } catch (error) {
@@ -374,6 +477,153 @@ const payBill = async (req, res, next) => {
     }
 };
 
+// @desc    Adjust bill due date & simulate demo scenarios (Overdue, Due Soon, Paid, Reset)
+// @route   PUT /api/bills/:id/adjust-date
+// @access  Private
+const adjustBillDueDate = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { scenario, daysOffset, customFine } = req.body;
+
+        const bill = await Bill.findById(id).populate({
+            path: 'consumer',
+            populate: { path: 'user' }
+        });
+
+        if (!bill) {
+            return res.status(404).json({ success: false, message: 'Bill record not found' });
+        }
+
+        const consumer = bill.consumer;
+        const user = consumer?.user;
+
+        if (scenario === 'OVERDUE' || (typeof daysOffset === 'number' && daysOffset < 0)) {
+            const offset = typeof daysOffset === 'number' ? daysOffset : -5;
+            const newDue = new Date(Date.now() + offset * 24 * 60 * 60 * 1000);
+            const fine = customFine || Math.max(150, Number((bill.totalAmount * 0.015).toFixed(2)));
+
+            bill.dueDate = newDue;
+            bill.status = 'OVERDUE';
+            bill.fineAmount = fine;
+            bill.fineImposed = true;
+            bill.fineImposedAt = new Date();
+            bill.fineReason = 'TANGEDCO Late Payment Surcharge (LPSC) for crossing statutory due date';
+            bill.dueAlertSent = true;
+            bill.fineAlertSent = true;
+            bill.paymentVerificationStatus = 'NONE';
+            await bill.save();
+
+            await Alert.create({
+                type: 'FINE_IMPOSED',
+                severity: 'HIGH',
+                title: 'TANGEDCO Late Payment Surcharge (LPSC) Imposed',
+                titleTa: 'தாமத அபராதக் கட்டணம் (LPSC) விதிக்கப்பட்டது',
+                message: `Statutory Warning: Your electricity bill of ₹${bill.totalAmount.toLocaleString()} for ${bill.billingMonth} is overdue by ${Math.abs(offset)} days. A late fee surcharge of ₹${fine} has been applied. Total Payable: ₹${(bill.totalAmount + fine).toLocaleString()}. Please settle immediately via TANGEDCO Quick Pay to avoid supply disconnection.`,
+                messageTa: `அறிவிப்பு: உங்கள் ${bill.billingMonth} மாத மின்கட்டணம் ₹${bill.totalAmount.toLocaleString()} நிலுவைத் தேதியைத் தாண்டிவிட்டதால் ₹${fine} அபராதக் கட்டணம் விதிக்கப்பட்டுள்ளது. செலுத்த வேண்டிய மொத்தத் தொகை: ₹${(bill.totalAmount + fine).toLocaleString()}. மின் துண்டிப்பைத் தவிர்க்க உடனே TANGEDCO Quick Pay மூலம் செலுத்தவும்.`,
+                consumer: consumer?._id,
+                user: user?._id,
+                bill: bill._id,
+                fineAmount: fine
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: `Bill adjusted to OVERDUE with ₹${fine} late fee surcharge. Alert dispatched.`,
+                data: bill
+            });
+        }
+
+        if (scenario === 'NEARING_DUE' || (typeof daysOffset === 'number' && daysOffset <= 3)) {
+            const offset = typeof daysOffset === 'number' ? daysOffset : 2;
+            const newDue = new Date(Date.now() + offset * 24 * 60 * 60 * 1000);
+
+            bill.dueDate = newDue;
+            bill.status = 'UNPAID';
+            bill.fineAmount = 0;
+            bill.fineImposed = false;
+            bill.fineImposedAt = null;
+            bill.dueAlertSent = true;
+            bill.paymentVerificationStatus = 'NONE';
+            await bill.save();
+
+            const dueDateFormatted = newDue.toLocaleDateString('en-IN', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric'
+            });
+
+            await Alert.create({
+                type: 'DUE_DATE_NEAR',
+                severity: 'HIGH',
+                title: 'TANGEDCO Due Date Alert (≤ 3 Days Remaining)',
+                titleTa: 'கட்டணக் கடைசி நாள் எச்சரிக்கை (3 நாட்களுக்குள்)',
+                message: `Statutory Warning: Your electricity bill of ₹${bill.totalAmount.toLocaleString()} for ${bill.billingMonth} is due in ${offset} days (Due Date: ${dueDateFormatted}). Clear before deadline to avoid a late fee surcharge of ₹150.`,
+                messageTa: `அறிவிப்பு: உங்கள் ${bill.billingMonth} மாத மின்கட்டணம் ₹${bill.totalAmount.toLocaleString()} செலுத்த இன்னும் ${offset} நாட்களே உள்ளன (கடைசி நாள்: ${dueDateFormatted}). ₹150 தாமத அபராதத்தைத் தவிர்க்க உடனே செலுத்தவும்.`,
+                consumer: consumer?._id,
+                user: user?._id,
+                bill: bill._id,
+                fineAmount: 150
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: `Bill adjusted to NEARING DUE (${offset} days remaining). Reminder alert dispatched.`,
+                data: bill
+            });
+        }
+
+        if (scenario === 'PENDING_VERIFICATION') {
+            const genRef = `TNEB-QPAY-${Date.now().toString().slice(-8)}`;
+            const totalPayable = Number((bill.totalAmount + (bill.fineAmount || 0)).toFixed(2));
+
+            bill.status = 'PENDING_VERIFICATION';
+            bill.paymentVerificationStatus = 'PENDING';
+            bill.submittedAt = new Date();
+            bill.paymentMode = 'TANGEDCO_QUICKPAY';
+            bill.transactionRef = genRef;
+            await bill.save();
+
+            await Alert.create({
+                type: 'PAYMENT_SUCCESS',
+                severity: 'MEDIUM',
+                title: 'TANGEDCO Payment Reference Submitted',
+                titleTa: 'கட்டண ரசீது எண் சரிபார்ப்புக்கு சமர்ப்பிக்கப்பட்டது',
+                message: `Payment reference ${genRef} submitted for ₹${totalPayable.toLocaleString()} (${bill.billingMonth}). Pending administrative ledger verification.`,
+                messageTa: `${bill.billingMonth} மாதத்திற்கான மின்கட்டண ரசீது எண் ${genRef} (₹${totalPayable.toLocaleString()}) சரிபார்ப்புக்கு சமர்ப்பிக்கப்பட்டுள்ளது.`,
+                consumer: consumer?._id,
+                user: user?._id,
+                bill: bill._id
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: `Bill submitted for admin payment verification with reference ${genRef}.`,
+                data: bill
+            });
+        }
+
+        // Default: NORMAL (15 Days)
+        const offset = typeof daysOffset === 'number' ? daysOffset : 15;
+        const newDue = new Date(Date.now() + offset * 24 * 60 * 60 * 1000);
+
+        bill.dueDate = newDue;
+        bill.status = 'UNPAID';
+        bill.fineAmount = 0;
+        bill.fineImposed = false;
+        bill.fineImposedAt = null;
+        bill.paymentVerificationStatus = 'NONE';
+        await bill.save();
+
+        return res.status(200).json({
+            success: true,
+            message: `Bill reset to NORMAL with ${offset} days grace period.`,
+            data: bill
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     calculateCommercialBill,
     calculateIndustrialBill,
@@ -381,5 +631,6 @@ module.exports = {
     saveGeneratedBill,
     getMyBills,
     getTariffRules,
-    payBill
+    payBill,
+    adjustBillDueDate
 };
