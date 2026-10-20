@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { Download, History, Receipt, FileText, CheckCircle2, AlertCircle, CreditCard, Zap, ShieldAlert } from 'lucide-react';
+import { Download, History, Receipt, FileText, CheckCircle2, AlertCircle, CreditCard, Zap, ShieldAlert, ExternalLink } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import PaymentModal from '../components/PaymentModal';
 
 const MONTHS_TA = {
     'January': 'ஜனவரி', 'February': 'பிப்ரவரி', 'March': 'மார்ச்',
@@ -33,13 +33,13 @@ const formatConnectionType = (type, lang) => {
 
 export default function BillHistory() {
     const { t, language } = useLanguage();
+    const navigate = useNavigate();
     const [bills, setBills] = useState([]);
     const [loading, setLoading] = useState(true);
     const [downloadingId, setDownloadingId] = useState(null);
     const [downloadingLatest, setDownloadingLatest] = useState(false);
     const [downloadingHistory, setDownloadingHistory] = useState(false);
     const [error, setError] = useState('');
-    const [selectedPayBill, setSelectedPayBill] = useState(null);
 
     useEffect(() => {
         const fetchBills = async () => {
@@ -246,11 +246,15 @@ export default function BillHistory() {
                                                 {bill.status !== 'PAID' && (
                                                     <button
                                                         type="button"
-                                                        onClick={() => setSelectedPayBill(bill)}
+                                                        onClick={() => {
+                                                            window.open('https://www.tnebnet.org/qpay/', '_blank', 'noopener,noreferrer');
+                                                            navigate('/payment');
+                                                        }}
                                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gold-500 hover:bg-gold-400 text-darker text-xs font-sans font-extrabold uppercase tracking-wide transition cursor-pointer shadow-md shadow-gold-500/10"
                                                     >
                                                         <Zap size={13} className="fill-darker" />
                                                         <span>{language === 'ta' ? 'செலுத்துக' : 'Pay Bill'}</span>
+                                                        <ExternalLink size={12} />
                                                     </button>
                                                 )}
 
@@ -279,21 +283,6 @@ export default function BillHistory() {
                     </div>
                 )}
             </div>
-
-            {/* Official TANGEDCO Payment Gateway Modal */}
-            <PaymentModal
-                bill={selectedPayBill}
-                isOpen={!!selectedPayBill}
-                onClose={() => setSelectedPayBill(null)}
-                onPaymentSuccess={(paidData) => {
-                    setBills(prev => prev.map(b => {
-                        if (b._id === paidData.billId) {
-                            return { ...b, status: 'PAID', paidAt: paidData.paidAt, paymentMode: paidData.paymentMode };
-                        }
-                        return b;
-                    }));
-                }}
-            />
         </div>
     );
 }

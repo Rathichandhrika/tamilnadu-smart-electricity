@@ -16,6 +16,9 @@ import Payment from './pages/Payment';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminPortal from './pages/AdminPortal';
 
+const adminEmails = ['admin@smarttn.gov', 'chandhrikarathi09@gmail.com'];
+const isUserAdmin = (u) => Boolean(u && (u.role === 'ADMIN' || (u.email && adminEmails.includes(u.email.toLowerCase()))));
+
 // Loading Spinner Component
 const FullScreenLoader = () => (
     <div className="min-h-screen bg-darker flex items-center justify-center">
@@ -29,7 +32,7 @@ function ConsumerRoute({ children }) {
     
     if (loading) return <FullScreenLoader />;
     if (!user) return <Navigate to="/" />;
-    if (user.role === 'ADMIN') return <Navigate to="/admin" replace />;
+    if (isUserAdmin(user)) return <Navigate to="/admin" replace />;
     return <Layout>{children}</Layout>;
 }
 
@@ -47,8 +50,8 @@ function AdminRoute({ children }) {
     
     if (loading) return <FullScreenLoader />;
     
-    // If user is NOT an admin, kick them back to the standard dashboard
-    return (user && user.role === 'ADMIN') ? <Layout>{children}</Layout> : <Navigate to="/dashboard" />;
+    // If user is an admin or authorized admin email, allow access
+    return isUserAdmin(user) ? <Layout>{children}</Layout> : <Navigate to="/dashboard" replace />;
 }
 
 function App() {
@@ -60,7 +63,7 @@ function App() {
         <Router>
             <Routes>
                 {/* PUBLIC ROUTE */}
-                <Route path="/" element={user ? <Navigate to={user.role === 'ADMIN' ? "/admin" : "/dashboard"} replace /> : <AuthPage />} />
+                <Route path="/" element={user ? <Navigate to={isUserAdmin(user) ? "/admin" : "/dashboard"} replace /> : <AuthPage />} />
 
                 {/* CONSUMER EXCLUSIVE ROUTES */}
                 <Route path="/dashboard" element={<ConsumerRoute><Dashboard /></ConsumerRoute>} />

@@ -24,7 +24,7 @@ import {
     Receipt
 } from 'lucide-react';
 
-const TANGEDCO_PAYMENT_URL = 'https://www.tnebnet.org/awp/login';
+const TANGEDCO_PAYMENT_URL = 'https://www.tnebnet.org/qpay/';
 
 const TN_DISTRICTS_MAP_TA = {
     'Ariyalur': 'அரியலூர்',
@@ -137,8 +137,8 @@ export default function Payment() {
             if (data.success) {
                 setConfirmationSuccess(
                     language === 'ta'
-                        ? 'மின்கட்டணப் பதிவு வெற்றிகரமாகப் புதுப்பிக்கப்பட்டது! ரசீது உருவாக்கப்பட்டது.'
-                        : 'Payment reference recorded and invoice marked as PAID successfully!'
+                        ? 'மின்கட்டண ரசீது எண் வெற்றிகரமாக சமர்ப்பிக்கப்பட்டது! நிர்வாகியின் சரிபார்ப்பிற்குப் பிறகு அதிகாரப்பூர்வ ரசீது வழங்கப்படும்.'
+                        : 'Bill number submitted successfully! Sent to Admin for payment verification. Official tax receipt will be issued upon approval.'
                 );
                 setTimeout(() => {
                     setSelectedBillForConfirmation(null);
@@ -514,7 +514,7 @@ export default function Payment() {
                                                         className="flex-1 sm:flex-initial py-2.5 px-4 bg-dark hover:bg-darker border border-emerald-500/40 text-emerald-300 hover:text-emerald-200 font-bold text-xs uppercase tracking-wider rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5"
                                                     >
                                                         <CheckCircle2 size={14} />
-                                                        <span>{language === 'ta' ? 'செலுத்தியதை உறுதிப்படுத்துக' : 'Confirm Payment Reference'}</span>
+                                                        <span>{language === 'ta' ? 'ரசீது எண் உள்ளீடு (சரிபார்ப்புக்கு)' : 'Enter Bill Number for Verification'}</span>
                                                     </button>
                                                 </>
                                             )}
@@ -571,7 +571,7 @@ export default function Payment() {
             )}
 
             {/* =========================================================================
-               MODAL: CONFIRM TANGEDCO PAYMENT SUBMISSION
+               MODAL: SUBMIT TANGEDCO BILL / RECEIPT NUMBER FOR ADMIN VERIFICATION
                ========================================================================= */}
             {selectedBillForConfirmation && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
@@ -583,7 +583,7 @@ export default function Payment() {
                                 </div>
                                 <div>
                                     <h3 className="font-black text-white text-base">
-                                        {language === 'ta' ? 'TANGEDCO கட்டண உறுதிப்படுத்தல்' : 'Submit TANGEDCO Payment Reference'}
+                                        {language === 'ta' ? 'TANGEDCO கட்டண ரசீது எண் சமர்ப்பித்தல்' : 'Submit Bill Number for Verification'}
                                     </h3>
                                     <p className="text-xs text-slate-400 mt-0.5">
                                         {selectedBillForConfirmation.billingMonth} — ₹{selectedBillForConfirmation.totalAmount?.toLocaleString()}
@@ -604,20 +604,20 @@ export default function Payment() {
                             <div className="p-3.5 bg-darker rounded-xl border border-panelBorder text-xs text-slate-300 leading-relaxed">
                                 <p>
                                     {language === 'ta'
-                                        ? 'TANGEDCO இணையதளத்தில் நீங்கள் கட்டணம் செலுத்திய பிறகு கிடைத்த பரிவர்த்தனை எண் / ரசீது எண்ணை (Transaction / Receipt Ref No.) கீழே உள்ளிட்டு சேமிக்கவும். இது உங்கள் மின்கட்டண நிலையை உடனே புதுப்பிக்கும்.'
-                                        : 'Enter the Transaction Reference Number or Receipt ID generated on the official TANGEDCO portal to update your ledger status.'}
+                                        ? 'TANGEDCO அதிகாரப்பூர்வ இணையதளத்தில் நீங்கள் கட்டணம் செலுத்திய பிறகு கிடைத்த பில் எண் அல்லது பரிவர்த்தனை ரசீது எண்ணை (Transaction / Receipt Ref No.) கீழே உள்ளிட்டு சமர்ப்பிக்கவும். இது நிர்வாகியின் சரிபார்ப்பிற்கு அனுப்பப்பட்டு, சரிபார்க்கப்பட்டவுடன் அதிகாரப்பூர்வ ரசீது உருவாக்கப்படும்.'
+                                        : 'After completing your payment on the official TANGEDCO portal, enter the Bill Number or Transaction Receipt ID below. It will be sent directly to the Admin for payment verification and official tax receipt generation.'}
                                 </p>
                             </div>
 
                             <div>
                                 <label className="block text-xs uppercase font-bold text-slate-400 mb-2">
-                                    {language === 'ta' ? 'TANGEDCO பரிவர்த்தனை / ரசீது எண் (Transaction Ref ID)' : 'TANGEDCO Transaction Reference / Receipt Ref'}
+                                    {language === 'ta' ? 'TANGEDCO பில் / ரசீது எண் (Bill / Receipt Reference No.)' : 'TANGEDCO Bill / Transaction Receipt Number'}
                                 </label>
                                 <input
                                     type="text"
                                     value={tnebTxnRef}
                                     onChange={(e) => setTnebTxnRef(e.target.value)}
-                                    placeholder="e.g. TNEB-2026-89472910"
+                                    placeholder="e.g. 04-123-001234-OCT26 or TNEB-PAY-98421054"
                                     className="w-full bg-darker border border-panelBorder rounded-xl px-4 py-3 text-white font-mono text-sm focus:border-emerald-500"
                                     required
                                 />
@@ -656,8 +656,8 @@ export default function Payment() {
                                     )}
                                     <span>
                                         {confirmingPayment
-                                            ? (language === 'ta' ? 'பதிவாகிறது...' : 'Submitting...')
-                                            : (language === 'ta' ? 'உறுதிப்படுத்தி சேமிக்க' : 'Confirm & Mark as Paid')}
+                                            ? (language === 'ta' ? 'அனுப்பப்படுகிறது...' : 'Submitting to Admin...')
+                                            : (language === 'ta' ? 'நிர்வாகி சரிபார்ப்புக்கு அனுப்புக' : 'Submit for Admin Verification')}
                                     </span>
                                 </button>
                             </div>

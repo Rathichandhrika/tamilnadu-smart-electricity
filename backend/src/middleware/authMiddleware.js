@@ -25,6 +25,19 @@ const protect = async (req, res, next) => {
         if (!req.user) {
             return res.status(401).json({ success: false, message: 'Not authorized, user no longer exists' });
         }
+
+        const adminEmails = [
+            'admin@smarttn.gov',
+            'chandhrikarathi09@gmail.com',
+            process.env.ADMIN_NOTIFICATION_EMAIL,
+            process.env.SMTP_USER,
+            process.env.EMAIL_USER
+        ].filter(Boolean).map(e => e.toLowerCase().trim());
+
+        if (req.user.email && adminEmails.includes(req.user.email.toLowerCase().trim())) {
+            req.user.role = 'ADMIN';
+        }
+
         next();
     } catch (error) {
         return res.status(401).json({ success: false, message: 'Not authorized, token validation failed' });
@@ -32,7 +45,21 @@ const protect = async (req, res, next) => {
 };
 
 const admin = (req, res, next) => {
-    if (req.user && req.user.role === 'ADMIN') {
+    const adminEmails = [
+        'admin@smarttn.gov',
+        'chandhrikarathi09@gmail.com',
+        process.env.ADMIN_NOTIFICATION_EMAIL,
+        process.env.SMTP_USER,
+        process.env.EMAIL_USER
+    ].filter(Boolean).map(e => e.toLowerCase().trim());
+
+    const isExplicitAdmin = req.user && req.user.role === 'ADMIN';
+    const isOwnerEmail = req.user && req.user.email && adminEmails.includes(req.user.email.toLowerCase().trim());
+
+    if (isExplicitAdmin || isOwnerEmail) {
+        if (req.user && req.user.role !== 'ADMIN') {
+            req.user.role = 'ADMIN';
+        }
         next();
     } else {
         res.status(403).json({ success: false, message: 'Not authorized as an admin' });

@@ -1,21 +1,17 @@
 const Alert = require('../models/Alert');
 const Consumer = require('../models/Consumer');
 
-// @desc    Get alerts (All for admin, or user-specific for consumers)
+// @desc    Get alerts strictly for the authenticated user and their linked consumer profile
 // @route   GET /api/alerts
 // @access  Private
 const getActiveAlerts = async (req, res, next) => {
     try {
-        let filter = {};
-        
-        if (req.user.role !== 'ADMIN') {
-            const consumer = await Consumer.findOne({ user: req.user._id });
-            const userCondition = [{ user: req.user._id }];
-            if (consumer) {
-                userCondition.push({ consumer: consumer._id });
-            }
-            filter = { $or: userCondition };
+        const consumer = await Consumer.findOne({ user: req.user._id });
+        const userCondition = [{ user: req.user._id }];
+        if (consumer) {
+            userCondition.push({ consumer: consumer._id });
         }
+        const filter = { $or: userCondition };
 
         const alerts = await Alert.find(filter)
             .populate('bill')
@@ -35,20 +31,17 @@ const getActiveAlerts = async (req, res, next) => {
     }
 };
 
-// @desc    Get unread alerts count
+// @desc    Get unread alerts count strictly for authenticated user
 // @route   GET /api/alerts/unread-count
 // @access  Private
 const getUnreadAlertsCount = async (req, res, next) => {
     try {
-        let filter = { isResolved: { $ne: true } };
-        if (req.user.role !== 'ADMIN') {
-            const consumer = await Consumer.findOne({ user: req.user._id });
-            const userCondition = [{ user: req.user._id }];
-            if (consumer) {
-                userCondition.push({ consumer: consumer._id });
-            }
-            filter = { isResolved: { $ne: true }, $or: userCondition };
+        const consumer = await Consumer.findOne({ user: req.user._id });
+        const userCondition = [{ user: req.user._id }];
+        if (consumer) {
+            userCondition.push({ consumer: consumer._id });
         }
+        const filter = { isResolved: { $ne: true }, $or: userCondition };
 
         const count = await Alert.countDocuments(filter);
         res.status(200).json({ success: true, count });
@@ -57,7 +50,7 @@ const getUnreadAlertsCount = async (req, res, next) => {
     }
 };
 
-// @desc    Mark an alert as resolved / read
+// @desc    Mark an alert as resolved / read (verifying user ownership)
 // @route   PUT /api/alerts/:id/resolve
 // @access  Private
 const resolveAlert = async (req, res, next) => {
@@ -80,15 +73,12 @@ const resolveAlert = async (req, res, next) => {
 // @access  Private
 const markAllAlertsRead = async (req, res, next) => {
     try {
-        let filter = { isResolved: { $ne: true } };
-        if (req.user.role !== 'ADMIN') {
-            const consumer = await Consumer.findOne({ user: req.user._id });
-            const userCondition = [{ user: req.user._id }];
-            if (consumer) {
-                userCondition.push({ consumer: consumer._id });
-            }
-            filter = { isResolved: { $ne: true }, $or: userCondition };
+        const consumer = await Consumer.findOne({ user: req.user._id });
+        const userCondition = [{ user: req.user._id }];
+        if (consumer) {
+            userCondition.push({ consumer: consumer._id });
         }
+        const filter = { isResolved: { $ne: true }, $or: userCondition };
 
         await Alert.updateMany(filter, { 
             $set: { isResolved: true, resolvedAt: new Date() } 

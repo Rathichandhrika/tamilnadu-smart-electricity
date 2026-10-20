@@ -401,13 +401,19 @@ const payBill = async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'Bill record not found' });
         }
 
+        const isOwner = bill.consumer?.user?._id?.toString() === req.user._id.toString();
+        const isAdmin = req.user.role === 'ADMIN';
+
+        if (!isOwner && !isAdmin) {
+            return res.status(403).json({ success: false, message: 'Not authorized to submit payment for this bill.' });
+        }
+
         if (bill.status === 'PAID' && bill.paymentVerificationStatus === 'VERIFIED') {
             return res.status(400).json({ success: false, message: 'This bill has already been verified and paid.' });
         }
 
         const totalPayable = Number((bill.totalAmount + (bill.fineAmount || 0)).toFixed(2));
         const genRef = transactionRef || `TNEB-QPAY-${Date.now().toString().slice(-8)}`;
-        const isAdmin = req.user.role === 'ADMIN';
 
         if (isAdmin || directConfirm) {
             bill.status = 'PAID';
@@ -428,31 +434,54 @@ const payBill = async (req, res, next) => {
         const consumer = bill.consumer;
         const user = consumer?.user;
 
+        // Clear previous due date / overdue fine alerts for this bill
+        await Alert.deleteMany({
+            bill: bill._id,
+            type: { $in: ['DUE_DATE_NEAR', 'FINE_IMPOSED'] }
+        });
+
         // Create In-App Notification
         if (bill.status === 'PAID') {
             await Alert.create({
                 type: 'PAYMENT_SUCCESS',
                 severity: 'LOW',
-                title: 'TANGEDCO E-Receipt Generated & Verified',
+                title: 'TANGEDCO Official Tax Invoice & Receipt Generated',
                 titleTa: 'மின்கட்டணம் உறுதி செய்யப்பட்டு ரசீது உருவாக்கப்பட்டது',
-                message: `Payment Verified: ₹${totalPayable.toLocaleString()} for ${bill.billingMonth} via ${paymentMode.replace(/_/g, ' ')}. Reference ID: ${genRef}.`,
-                messageTa: `மின்கட்டணம் வெற்றிகரமாக உறுதிசெய்யப்பட்டது: ₹${totalPayable.toLocaleString()} (${bill.billingMonth}) - ${paymentMode}. ரசீது எண்: ${genRef}.`,
+                message: `Payment Verified: ₹${totalPayable.toLocaleString()} for ${bill.billingMonth} via ${paymentMode.replace(/_/g, ' ')}. Reference ID: ${genRef}. Your official receipt is ready to download.`,
+                messageTa: `மின்கட்டணம் வெற்றிகரமாக உறுதிசெய்யப்பட்டது: ₹${totalPayable.toLocaleString()} (${bill.billingMonth}) - ${paymentMode}. ரசீது எண்: ${genRef}. அதிகாரப்பூர்வ ரசீது பதிவிறக்கம் செய்யத் தயாராக உள்ளது.`,
                 consumer: consumer?._id,
                 user: user?._id,
                 bill: bill._id
             });
         } else {
+            // Consumer Alert
             await Alert.create({
                 type: 'PAYMENT_SUCCESS',
                 severity: 'MEDIUM',
-                title: 'TANGEDCO Payment Reference Submitted',
-                titleTa: 'கட்டண ரசீது எண் சரிபார்ப்புக்கு அனுப்பப்பட்டது',
-                message: `Payment reference ${genRef} submitted for ₹${totalPayable.toLocaleString()} (${bill.billingMonth}). Pending administrative ledger verification.`,
-                messageTa: `${bill.billingMonth} மாதத்திற்கான மின்கட்டண ரசீது எண் ${genRef} (₹${totalPayable.toLocaleString()}) சரிபார்ப்புக்கு சமர்ப்பிக்கப்பட்டுள்ளது.`,
+                title: 'TANGEDCO Bill Number Submitted for Verification',
+                titleTa: 'கட்டண ரசீது எண் நிர்வாகியின் சரிபார்ப்புக்கு அனுப்பப்பட்டது',
+                message: `Payment/Bill reference ${genRef} submitted for ₹${totalPayable.toLocaleString()} (${bill.billingMonth}). Sent to Admin for payment verification.`,
+                messageTa: `${bill.billingMonth} மாதத்திற்கான மின்கட்டண ரசீது எண் ${genRef} (₹${totalPayable.toLocaleString()}) நிர்வாகியின் சரிபார்ப்புக்கு சமர்ப்பிக்கப்பட்டுள்ளது. சரிபார்க்கப்பட்டதும் அதிகாரப்பூர்வ ரசீது வழங்கப்படும்.`,
                 consumer: consumer?._id,
                 user: user?._id,
                 bill: bill._id
             });
+
+            // Admin Alert
+            const adminUsers = await User.find({ role: 'ADMIN' });
+            for (const adm of adminUsers) {
+                await Alert.create({
+                    type: 'PAYMENT_VERIFICATION_REQUEST',
+                    severity: 'HIGH',
+                    title: 'Consumer Payment Verification Request',
+                    titleTa: 'நுகர்வோர் கட்டண சரிபார்ப்பு கோரிக்கை',
+                    message: `Consumer ${user?.name || 'Consumer'} (Service: ${consumer?.serviceNumber || 'N/A'}) submitted TANGEDCO Bill/Receipt No: ${genRef} for ₹${totalPayable.toLocaleString()} (${bill.billingMonth}). Action required: Verify and approve in Admin Portal.`,
+                    messageTa: `நுகர்வோர் ${user?.name || 'Consumer'} (${consumer?.serviceNumber || 'N/A'}) மின்கட்டண ரசீது எண் ${genRef} (₹${totalPayable.toLocaleString()} - ${bill.billingMonth}) சமர்ப்பித்துள்ளார். சரிபார்த்து அங்கீகரிக்கவும்.`,
+                    user: adm._id,
+                    bill: bill._id,
+                    consumer: consumer?._id
+                });
+            }
         }
 
         res.status(200).json({

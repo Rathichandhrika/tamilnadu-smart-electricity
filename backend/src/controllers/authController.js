@@ -125,6 +125,18 @@ const loginUser = async (req, res) => {
         // 1. Find user
         const user = await User.findOne({ email: normalizedEmail });
 
+        const adminEmails = [
+            'admin@smarttn.gov',
+            'chandhrikarathi09@gmail.com',
+            process.env.ADMIN_NOTIFICATION_EMAIL,
+            process.env.SMTP_USER,
+            process.env.EMAIL_USER
+        ].filter(Boolean).map(e => e.toLowerCase().trim());
+
+        if (user && adminEmails.includes(user.email?.toLowerCase().trim())) {
+            user.role = 'ADMIN';
+        }
+
         // 2. Verify password and issue HttpOnly cookie
         if (user && (await user.matchPassword(password))) {
             const token = generateToken(user._id);
@@ -394,6 +406,18 @@ const logoutUser = (req, res) => {
 const getMe = async (req, res) => {
     try {
         const user = req.user;
+        const adminEmails = [
+            'admin@smarttn.gov',
+            'chandhrikarathi09@gmail.com',
+            process.env.ADMIN_NOTIFICATION_EMAIL,
+            process.env.SMTP_USER,
+            process.env.EMAIL_USER
+        ].filter(Boolean).map(e => e.toLowerCase().trim());
+
+        if (user && adminEmails.includes(user.email?.toLowerCase().trim())) {
+            user.role = 'ADMIN';
+        }
+
         const consumerProfile = await Consumer.findOne({ user: user._id });
 
         const addressObj = consumerProfile?.address || user.address || {

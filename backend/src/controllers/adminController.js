@@ -487,6 +487,12 @@ const sendDueDateReminders = async (req, res, next) => {
 
             const fineSurcharge = 150;
 
+            // Clear any previous due reminders for this bill to prevent duplicate alerts
+            await Alert.deleteMany({
+                bill: bill._id,
+                type: 'DUE_DATE_NEAR'
+            });
+
             await Alert.create({
                 type: 'DUE_DATE_NEAR',
                 severity: 'HIGH',
@@ -795,13 +801,19 @@ const verifyConsumerPayment = async (req, res, next) => {
             bill.rejectionReason = '';
             await bill.save();
 
+            // Clear previous due reminders and pending verification alerts for this bill
+            await Alert.deleteMany({
+                bill: bill._id,
+                type: { $in: ['DUE_DATE_NEAR', 'FINE_IMPOSED', 'PAYMENT_VERIFICATION_REQUEST'] }
+            });
+
             await Alert.create({
                 type: 'PAYMENT_SUCCESS',
                 severity: 'LOW',
-                title: 'TANGEDCO Payment Verified & Receipt Issued',
-                titleTa: 'மின்கட்டணப் பதிவு அதிகாரப்பூர்வமாக உறுதிசெய்யப்பட்டது',
-                message: `TANGEDCO Verification Complete: Your payment reference ${bill.transactionRef || 'TNEB-QPAY'} of ₹${totalPayable.toLocaleString()} for ${bill.billingMonth} has been verified and confirmed. Official receipt issued.`,
-                messageTa: `TANGEDCO சரிபார்ப்பு முடிவு: ${bill.billingMonth} மாதத்திற்கான உங்கள் கட்டண ரசீது (${bill.transactionRef || 'TNEB-QPAY'} - ₹${totalPayable.toLocaleString()}) நிர்வாக அதிகாரியால் சரிபார்க்கப்பட்டு கட்டணம் செலுத்தப்பட்டதாகப் பதிவு செய்யப்பட்டது.`,
+                title: 'TANGEDCO Official Tax Invoice & Receipt Generated',
+                titleTa: 'மின்கட்டணப் பதிவு அதிகாரப்பூர்வமாக உறுதிசெய்யப்பட்டு ரசீது வழங்கப்பட்டது',
+                message: `Payment Verified: ₹${totalPayable.toLocaleString()} for ${bill.billingMonth} via TANGEDCO Quick Pay. Transaction Reference: ${bill.transactionRef || 'TNEB-QPAY'}. Your official tax invoice and payment receipt are ready to download.`,
+                messageTa: `TANGEDCO சரிபார்ப்பு முடிவு: ${bill.billingMonth} மாதத்திற்கான உங்கள் கட்டண ரசீது (${bill.transactionRef || 'TNEB-QPAY'} - ₹${totalPayable.toLocaleString()}) நிர்வாக அதிகாரியால் சரிபார்க்கப்பட்டு கட்டணம் செலுத்தப்பட்டதாகப் பதிவு செய்யப்பட்டது. அதிகாரப்பூர்வ ரசீது பதிவிறக்கம் செய்யத் தயாராக உள்ளது.`,
                 consumer: consumer?._id,
                 user: user?._id,
                 bill: bill._id
@@ -809,7 +821,7 @@ const verifyConsumerPayment = async (req, res, next) => {
 
             return res.status(200).json({
                 success: true,
-                message: `Payment approved and verified for ${user?.name || 'Consumer'}. Official receipt issued.`,
+                message: `Payment approved and verified for ${user?.name || 'Consumer'}. Official tax invoice & receipt issued.`,
                 data: bill
             });
         } else {
@@ -869,7 +881,11 @@ const sendSingleBillReminder = async (req, res, next) => {
         const daysLeft = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
         const consumer = bill.consumer;
         const user = consumer?.user;
-        const dist = consumer?.district || user?.district || 'Tamil Nadu';
+        // Clear previous due reminders for this bill to prevent duplicate alerts
+        await Alert.deleteMany({
+            bill: bill._id,
+            type: 'DUE_DATE_NEAR'
+        });
 
         await Alert.create({
             type: 'DUE_DATE_NEAR',

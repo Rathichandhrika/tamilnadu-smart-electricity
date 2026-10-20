@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import api from '../services/api';
@@ -27,6 +28,7 @@ import {
 export default function Notifications() {
     const { user } = useContext(AuthContext);
     const { t, language } = useLanguage();
+    const navigate = useNavigate();
 
     const [alerts, setAlerts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -343,11 +345,15 @@ export default function Notifications() {
                                                     {alert.bill.status !== 'PAID' && (
                                                         <button
                                                             type="button"
-                                                            onClick={() => setSelectedPayBill(alert.bill)}
+                                                            onClick={() => {
+                                                                window.open('https://www.tnebnet.org/qpay/', '_blank', 'noopener,noreferrer');
+                                                                navigate('/payment');
+                                                            }}
                                                             className="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-darker font-extrabold text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-gold-500/10"
                                                         >
                                                             <CreditCard size={14} />
                                                             <span>{language === 'ta' ? 'உடனே கட்டணம் செலுத்து' : 'Pay Bill Now'}</span>
+                                                            <ExternalLink size={12} />
                                                         </button>
                                                     )}
                                                 </div>

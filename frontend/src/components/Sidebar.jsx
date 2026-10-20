@@ -17,7 +17,8 @@ export default function Sidebar({ isOpen, close }) {
     const [unreadCount, setUnreadCount] = useState(0);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
-    const isAdmin = user?.role === 'ADMIN';
+    const adminEmails = ['admin@smarttn.gov', 'chandhrikarathi09@gmail.com'];
+    const isAdmin = Boolean(user && (user.role === 'ADMIN' || (user.email && adminEmails.includes(user.email.toLowerCase()))));
     const searchParams = new URLSearchParams(location.search);
     const currentTab = searchParams.get('tab') || 'BILLING';
 
