@@ -1533,15 +1533,27 @@ export default function AdminPortal() {
                                                         </span>
                                                     </td>
                                                     <td className="p-4 text-right">
-                                                        <button
-                                                            onClick={() => {
-                                                                setSelectedConsumer(c);
-                                                                setSelectedDocIndex(0);
-                                                            }}
-                                                            className="px-3 py-1.5 rounded-lg bg-gold-500/15 hover:bg-gold-500/25 border border-gold-500/40 text-gold-400 text-xs font-bold transition cursor-pointer"
-                                                        >
-                                                            {t('admin.inspectDocs')}
-                                                        </button>
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setEditingConsumerProfile(c)}
+                                                                className="px-2.5 py-1.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/40 text-blue-400 text-xs font-bold transition cursor-pointer flex items-center gap-1 shrink-0"
+                                                                title={language === 'ta' ? 'நுகர்வோர் சுயவிவரத்தைத் திருத்து' : 'Edit Consumer Profile'}
+                                                            >
+                                                                <UserCog size={12} />
+                                                                <span>{language === 'ta' ? 'சுயவிவரம்' : 'Edit Profile'}</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedConsumer(c);
+                                                                    setSelectedDocIndex(0);
+                                                                }}
+                                                                className="px-3 py-1.5 rounded-lg bg-gold-500/15 hover:bg-gold-500/25 border border-gold-500/40 text-gold-400 text-xs font-bold transition cursor-pointer shrink-0"
+                                                            >
+                                                                {t('admin.inspectDocs')}
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );
@@ -2037,12 +2049,23 @@ export default function AdminPortal() {
                         </div>
 
                         <div className="p-4 border-t border-panelBorder bg-darker flex justify-between items-center">
-                            <button
-                                onClick={() => setSelectedConsumer(null)}
-                                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white bg-dark"
-                            >
-                                {t('admin.close', 'Close')}
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setSelectedConsumer(null)}
+                                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white bg-dark"
+                                >
+                                    {t('admin.close', 'Close')}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingConsumerProfile(selectedConsumer)}
+                                    className="px-3 py-2 rounded-xl text-xs font-bold bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/40 text-blue-400 flex items-center gap-1.5 transition cursor-pointer"
+                                    title={language === 'ta' ? 'நுகர்வோர் விவரங்களைத் திருத்து' : 'Edit Profile Details'}
+                                >
+                                    <UserCog size={13} />
+                                    <span>{language === 'ta' ? 'சுயவிவரம் திருத்து' : 'Edit Profile'}</span>
+                                </button>
+                            </div>
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => handleStatusUpdate(selectedConsumer._id, 'REJECTED')}

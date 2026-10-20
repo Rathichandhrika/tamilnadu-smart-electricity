@@ -206,25 +206,81 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/alerts', alertRoutes);
 
-// High-Definition Neural TTS Proxy
+// High-Definition Neural & Native Bilingual TTS Engine (Tamil & English)
 app.get('/api/tts', async (req, res) => {
     try {
         const { text, lang } = req.query;
-        if (!text) return res.status(400).json({ success: false, message: 'Text is required' });
+        if (!text || !text.trim()) {
+            return res.status(400).json({ success: false, message: 'Text query is required' });
+        }
 
-        const mlUrl = (process.env.ML_SERVICE_URL || 'http://127.0.0.1:5001') + '/tts';
-        const response = await axios({
-            method: 'get',
-            url: mlUrl,
-            params: { text, lang: lang || 'ta' },
-            responseType: 'stream',
-            timeout: 10000
+        const targetLang = (lang === 'ta' || lang === 'ta-IN') ? 'ta' : 'en';
+
+        // Clean markdown symbols, bullets, emojis, and normalize text for speech
+        let cleanText = text
+            .replace(/[*_#`~[\]()]/g, ' ')
+            .replace(/₹\s*(\d+)/g, targetLang === 'ta' ? '$1 ரூபாய்' : '$1 rupees')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        // 1. Try ML Service if available (quick 1.2s timeout)
+        if (process.env.ML_SERVICE_URL) {
+            try {
+                const mlUrl = `${process.env.ML_SERVICE_URL.replace(/\/+$/, '')}/tts`;
+                const mlResponse = await axios({
+                    method: 'get',
+                    url: mlUrl,
+                    params: { text: cleanText, lang: targetLang },
+                    responseType: 'stream',
+                    timeout: 1200
+                });
+                res.setHeader('Content-Type', 'audio/mpeg');
+                return mlResponse.data.pipe(res);
+            } catch (mlErr) {
+                // Silently fall through to high-speed native Google TTS engine
+            }
+        }
+
+        // 2. High-Speed Google Neural TTS Engine (supports Tamil & English natively)
+        // Split long responses into sentences/phrases (<= 180 chars per Google TTS chunk)
+        const chunks = [];
+        let currentChunk = '';
+        const words = cleanText.split(' ');
+        for (const word of words) {
+            if ((currentChunk + ' ' + word).trim().length <= 180) {
+                currentChunk = (currentChunk + ' ' + word).trim();
+            } else {
+                if (currentChunk) chunks.push(currentChunk);
+                currentChunk = word;
+            }
+        }
+        if (currentChunk) chunks.push(currentChunk);
+
+        // Fetch all audio chunks concurrently (limit to first 4 chunks / ~700 chars max for speech response)
+        const activeChunks = chunks.slice(0, 4);
+        const audioPromises = activeChunks.map(async (chunk) => {
+            const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(chunk)}&tl=${targetLang}&client=tw-ob`;
+            const audioRes = await axios.get(ttsUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Referer': 'https://translate.google.com/'
+                },
+                responseType: 'arraybuffer',
+                timeout: 5000
+            });
+            return Buffer.from(audioRes.data);
         });
 
-        res.setHeader('Content-Type', 'audio/mp3');
-        response.data.pipe(res);
+        const audioBuffers = await Promise.all(audioPromises);
+        const combinedAudio = Buffer.concat(audioBuffers);
+
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Content-Length', combinedAudio.length);
+        res.setHeader('Accept-Ranges', 'bytes');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.send(combinedAudio);
     } catch (err) {
-        console.error('TTS proxy error:', err.message);
+        console.error('TTS synthesis error:', err.message);
         res.status(500).json({ success: false, message: 'TTS audio synthesis failed' });
     }
 });

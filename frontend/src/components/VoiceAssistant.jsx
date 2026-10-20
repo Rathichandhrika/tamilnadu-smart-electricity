@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { AuthContext } from '../context/AuthContext';
 import { queryAiKnowledge } from '../services/aiAssistantService';
+import api from '../services/api';
 import {
     Mic, MicOff, Volume2, Sparkles, X, ChevronRight,
-    Bot, ArrowRight, Activity, Calculator, BrainCircuit, Globe, Send
+    Bot, ArrowRight, Activity, Calculator, BrainCircuit, Globe, Send, RotateCcw
 } from 'lucide-react';
 
 export default function VoiceAssistant() {
@@ -153,6 +154,15 @@ export default function VoiceAssistant() {
         return { voice: enVoices[0] || null, pitch: 1.35, rate: 1.0 };
     };
 
+    // Helper: Construct full TTS stream URL adhering to development and production backend configurations
+    const getTtsUrl = (text, isTamil) => {
+        let base = api.defaults.baseURL ? api.defaults.baseURL.replace(/\/+$/, '') : '';
+        if (!base && typeof window !== 'undefined') {
+            base = `${window.location.protocol}//${window.location.hostname}:5000/api`;
+        }
+        return `${base}/tts?text=${encodeURIComponent(text)}&lang=${isTamil ? 'ta' : 'en'}&_t=${Date.now()}`;
+    };
+
     // Offline Web Speech API fallback
     const speakWithWebSpeech = (text, isTamil) => {
         if (!window.speechSynthesis) {
@@ -161,6 +171,7 @@ export default function VoiceAssistant() {
         }
 
         try {
+            window.speechSynthesis.cancel();
             if (window.speechSynthesis.paused) {
                 window.speechSynthesis.resume();
             }
@@ -172,9 +183,14 @@ export default function VoiceAssistant() {
             const config = getBestVoiceConfig(utterance.lang);
             if (config.voice) {
                 utterance.voice = config.voice;
+            } else if (isTamil) {
+                // If system has no Tamil voice (common on Windows), fallback to available Indian/English voice
+                const fallback = (availableVoices.length > 0 ? availableVoices : window.speechSynthesis.getVoices())
+                    .find(v => v.lang.includes('IN') || v.lang.startsWith('en'));
+                if (fallback) utterance.voice = fallback;
             }
-            utterance.pitch = config.pitch;
-            utterance.rate = config.rate;
+            utterance.pitch = config.pitch || 1.15;
+            utterance.rate = config.rate || 1.0;
 
             utterance.onstart = () => setIsSpeaking(true);
             utterance.onend = () => setIsSpeaking(false);
@@ -193,11 +209,11 @@ export default function VoiceAssistant() {
 
         const targetLang = langCode || (language === 'ta' ? 'ta' : 'en');
         const isTamil = targetLang === 'ta' || targetLang === 'ta-IN';
-        const cleanText = text.replace(/[*_#`~[\]()]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 350);
+        const cleanText = text.replace(/[*_#`~[\]()]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 450);
 
         try {
-            // 1. High-Definition Neural Female Voice Stream from Backend (/api/tts)
-            const ttsUrl = `/api/tts?text=${encodeURIComponent(cleanText)}&lang=${isTamil ? 'ta' : 'en'}`;
+            // 1. High-Definition Native Bilingual Voice Stream from Backend (/api/tts)
+            const ttsUrl = getTtsUrl(cleanText, isTamil);
             const audio = new Audio(ttsUrl);
             audioRef.current = audio;
 
@@ -214,7 +230,7 @@ export default function VoiceAssistant() {
             };
 
             audio.onerror = (err) => {
-                console.warn('Neural TTS stream error, falling back to browser synthesis:', err);
+                console.warn('Native TTS audio failed, trying browser synthesis:', err);
                 if (!playbackStarted) {
                     audioRef.current = null;
                     speakWithWebSpeech(cleanText, isTamil);
@@ -224,6 +240,7 @@ export default function VoiceAssistant() {
             const playPromise = audio.play();
             if (playPromise !== undefined) {
                 playPromise.catch((err) => {
+                    console.warn('Audio play rejected, falling back to Web Speech:', err.message);
                     if (!playbackStarted) {
                         audioRef.current = null;
                         speakWithWebSpeech(cleanText, isTamil);
@@ -248,9 +265,8 @@ export default function VoiceAssistant() {
         const greeting = getGreetingMessage(language);
         setResponseMessage(greeting);
         setTranscript('');
-        setTimeout(() => {
-            speakResponse(greeting);
-        }, 150);
+        // Start speech playback immediately within the user-click interaction context
+        speakResponse(greeting, language);
     };
 
     // Keep initial/greeting message in sync when language changes
@@ -355,9 +371,25 @@ export default function VoiceAssistant() {
                             </div>
 
                             <div className="flex items-center gap-2">
+                                {/* Test Voice Button */}
+                                <button
+                                    onClick={() => speakResponse(responseMessage || getGreetingMessage(language), language)}
+                                    className="px-2.5 py-1 rounded-lg bg-gold-500/15 border border-gold-500/40 hover:bg-gold-500/25 text-gold-400 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                                    title={language === 'ta' ? 'மின்னி ஏஐ குரல் சோதனை' : 'Test Minni AI Voice'}
+                                >
+                                    <Volume2 size={13} className={isSpeaking ? 'text-amber-400 animate-bounce' : ''} />
+                                    <span>{language === 'ta' ? 'குரல் கேட்க' : 'Test Voice'}</span>
+                                </button>
+
                                 {/* Language Toggle Inside Modal */}
                                 <button
-                                    onClick={() => setLanguage(language === 'en' ? 'ta' : 'en')}
+                                    onClick={() => {
+                                        const newLang = language === 'en' ? 'ta' : 'en';
+                                        setLanguage(newLang);
+                                        const newGreeting = getGreetingMessage(newLang);
+                                        setResponseMessage(newGreeting);
+                                        speakResponse(newGreeting, newLang);
+                                    }}
                                     className="px-2.5 py-1 rounded-lg bg-darker border border-panelBorder hover:border-gold-500/40 text-slate-300 text-xs font-mono font-bold flex items-center gap-1 transition cursor-pointer"
                                 >
                                     <Globe size={12} className="text-gold-500" />
@@ -438,11 +470,21 @@ export default function VoiceAssistant() {
                                     </div>
                                 )}
                                 {responseMessage && (
-                                    <div className="flex items-start gap-2 text-xs pt-2 border-t border-panelBorder/50">
-                                        <span className="text-[10px] uppercase font-mono font-bold text-gold-400 min-w-[70px] flex items-center gap-1">
-                                            <Volume2 size={12} /> {language === 'ta' ? 'ஏஐ பதில்' : 'AI Reply'}:
-                                        </span>
-                                        <p className="text-white font-medium leading-relaxed">{responseMessage}</p>
+                                    <div className="flex items-start justify-between gap-3 text-xs pt-2 border-t border-panelBorder/50">
+                                        <div className="flex items-start gap-2 min-w-0">
+                                            <span className="text-[10px] uppercase font-mono font-bold text-gold-400 min-w-[70px] flex items-center gap-1 shrink-0">
+                                                <Volume2 size={12} className={isSpeaking ? 'text-amber-400 animate-pulse' : ''} /> {language === 'ta' ? 'ஏஐ பதில்' : 'AI Reply'}:
+                                            </span>
+                                            <p className="text-white font-medium leading-relaxed">{responseMessage}</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => speakResponse(responseMessage, language)}
+                                            className="p-1.5 rounded-lg bg-panel hover:bg-gold-500/10 border border-panelBorder hover:border-gold-500/30 text-slate-300 hover:text-gold-400 transition cursor-pointer shrink-0"
+                                            title={language === 'ta' ? 'மீண்டும் குரலில் கேட்க' : 'Replay Voice'}
+                                        >
+                                            <RotateCcw size={13} />
+                                        </button>
                                     </div>
                                 )}
                             </div>

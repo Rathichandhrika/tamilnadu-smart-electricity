@@ -379,11 +379,13 @@ const googleAuth = async (req, res) => {
 // @desc    Logout user & clear HttpOnly cookie
 // @route   POST /api/auth/logout
 const logoutUser = (req, res) => {
-    res.clearCookie('token', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict'
-    });
+    const opts = getCookieOptions();
+    delete opts.maxAge;
+    res.clearCookie('token', opts);
+    res.clearCookie('token', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/' });
+    res.clearCookie('token', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict', path: '/' });
+    res.clearCookie('token', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'none', path: '/' });
+    res.clearCookie('token', { path: '/' });
     res.json({ success: true, message: 'Logged out successfully' });
 };
 
@@ -713,25 +715,48 @@ const updateProfile = async (req, res) => {
             district, 
             pincode, 
             serviceNumber, 
-            connectionType 
+            connectionType,
+            consumerId,
+            userId 
         } = req.body;
 
-        const user = await User.findById(req.user._id);
+        // If requester is ADMIN, allow targeting a specific consumer/user profile
+        let targetUserId = req.user._id;
+        if (req.user.role === 'ADMIN') {
+            if (userId) {
+                targetUserId = userId;
+            } else if (consumerId) {
+                const targetC = await Consumer.findById(consumerId);
+                if (targetC && targetC.user) targetUserId = targetC.user;
+            } else if (email) {
+                const matchUser = await User.findOne({ email: email.toLowerCase().trim() });
+                if (matchUser && matchUser.role !== 'ADMIN') {
+                    targetUserId = matchUser._id;
+                }
+            }
+        }
+
+        const user = await User.findById(targetUserId);
         if (!user) {
             return res.status(404).json({ success: false, message: 'User account not found.' });
         }
 
-        // Validate unique email if changing email
-        if (email && email.toLowerCase().trim() !== user.email) {
+        // Validate unique email if changing email - MUST exclude this user's own _id!
+        if (email) {
             const normalizedEmail = email.toLowerCase().trim();
-            const existingUser = await User.findOne({ email: normalizedEmail });
-            if (existingUser) {
-                return res.status(400).json({ 
-                    success: false, 
-                    message: 'Email address is already in use by another account.' 
+            if (normalizedEmail !== (user.email || '').toLowerCase().trim()) {
+                const existingUser = await User.findOne({ 
+                    email: normalizedEmail,
+                    _id: { $ne: user._id }
                 });
+                if (existingUser) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: 'Email address is already in use by another account.' 
+                    });
+                }
+                user.email = normalizedEmail;
             }
-            user.email = normalizedEmail;
         }
 
         if (name && name.trim()) user.name = name.trim();

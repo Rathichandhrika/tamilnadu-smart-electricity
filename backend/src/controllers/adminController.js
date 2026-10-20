@@ -960,9 +960,23 @@ const updateConsumerProfileAdmin = async (req, res, next) => {
         const { id } = req.params;
         const { name, email, phone, street, district, pincode, serviceNumber } = req.body;
 
-        let consumer = await Consumer.findById(id).populate('user');
-        if (!consumer) {
-            consumer = await Consumer.findOne({ user: id }).populate('user');
+        let consumer = null;
+        if (id && id.match(/^[0-9a-fA-F]{24}$/)) {
+            consumer = await Consumer.findById(id).populate('user');
+            if (!consumer) {
+                consumer = await Consumer.findOne({ user: id }).populate('user');
+            }
+        }
+
+        if (!consumer && email) {
+            const matchedUser = await User.findOne({ email: email.trim().toLowerCase() });
+            if (matchedUser) {
+                consumer = await Consumer.findOne({ user: matchedUser._id }).populate('user');
+            }
+        }
+
+        if (!consumer && serviceNumber) {
+            consumer = await Consumer.findOne({ serviceNumber: serviceNumber.trim() }).populate('user');
         }
 
         if (!consumer) {

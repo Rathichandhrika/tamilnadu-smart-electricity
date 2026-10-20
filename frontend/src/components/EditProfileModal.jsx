@@ -120,8 +120,9 @@ export default function EditProfileModal({ isOpen, onClose, onProfileUpdated, ta
 
         setLoading(true);
         try {
-            const endpoint = (targetConsumer && targetConsumer._id && currentUser?.role === 'ADMIN')
-                ? `/admin/consumer/${targetConsumer._id}/profile`
+            const targetId = targetConsumer?._id || targetConsumer?.user?._id || (effectiveUser && effectiveUser._id !== currentUser?._id ? effectiveUser._id : null);
+            const endpoint = (targetId && currentUser?.role === 'ADMIN')
+                ? `/admin/consumer/${targetId}/profile`
                 : '/auth/profile';
 
             const payload = {
@@ -137,7 +138,9 @@ export default function EditProfileModal({ isOpen, onClose, onProfileUpdated, ta
                 },
                 district: district,
                 pincode: pincode.trim(),
-                serviceNumber: serviceNumber.trim()
+                serviceNumber: serviceNumber.trim(),
+                consumerId: targetConsumer?._id || undefined,
+                userId: targetConsumer?.user?._id || (effectiveUser && effectiveUser._id !== currentUser?._id ? effectiveUser._id : undefined)
             };
 
             const { data } = await api.put(endpoint, payload);
@@ -148,14 +151,16 @@ export default function EditProfileModal({ isOpen, onClose, onProfileUpdated, ta
                     : 'Consumer profile updated successfully.');
 
                 // If updating logged in user, update AuthContext
-                if (!targetConsumer || targetConsumer._id === currentUser?._id) {
-                    if (setUser) {
-                        setUser(prev => ({
-                            ...prev,
-                            ...data.data,
-                            address: data.data.address || payload.address
-                        }));
-                    }
+                const isSelf = !targetConsumer || 
+                               targetConsumer._id === currentUser?._id || 
+                               effectiveUser?._id === currentUser?._id ||
+                               email.trim().toLowerCase() === currentUser?.email?.toLowerCase();
+                if (isSelf && setUser) {
+                    setUser(prev => ({
+                        ...prev,
+                        ...(data.data || {}),
+                        address: data.data?.address || payload.address
+                    }));
                 }
 
                 if (onProfileUpdated) {
