@@ -132,17 +132,29 @@ const loginUser = async (req, res) => {
 
             res.cookie('token', token, getCookieOptions());
             
+            const addressObj = consumerProfile?.address || user.address || {
+                street: '',
+                city: user.district || consumerProfile?.district || 'Chennai',
+                district: user.district || consumerProfile?.district || 'Chennai',
+                pincode: ''
+            };
+
             res.json({
                 success: true,
                 data: {
                     _id: user._id,
                     name: user.name,
                     email: user.email,
+                    phone: user.phone || consumerProfile?.phone || '',
                     role: user.role,
                     connectionType: user.connectionType || consumerProfile?.connectionType || 'LT-1A_DOMESTIC',
+                    district: user.district || consumerProfile?.district || 'Chennai',
+                    address: addressObj,
+                    pincode: addressObj.pincode || '',
                     verificationStatus: user.verificationStatus || consumerProfile?.verificationStatus || 'PENDING',
                     serviceNumber: consumerProfile?.serviceNumber || null,
                     sanctionedLoadKw: consumerProfile?.sanctionedLoadKw || null,
+                    avatar: user.avatar || null,
                     kycDocuments: user.kycDocuments || consumerProfile?.kycDocuments || []
                 }
             });
@@ -332,14 +344,25 @@ const googleAuth = async (req, res) => {
         const token = generateToken(user._id);
         res.cookie('token', token, getCookieOptions());
 
+        const addressObj = consumerProfile?.address || user.address || {
+            street: '',
+            city: user.district || consumerProfile?.district || 'Chennai',
+            district: user.district || consumerProfile?.district || 'Chennai',
+            pincode: ''
+        };
+
         return res.json({
             success: true,
             data: {
                 _id: user._id,
                 name: user.name,
                 email: user.email,
+                phone: user.phone || consumerProfile?.phone || '',
                 role: user.role,
                 connectionType: user.connectionType || consumerProfile?.connectionType || 'LT-1A_DOMESTIC',
+                district: user.district || consumerProfile?.district || 'Chennai',
+                address: addressObj,
+                pincode: addressObj.pincode || '',
                 verificationStatus: user.verificationStatus || consumerProfile?.verificationStatus || 'PENDING',
                 serviceNumber: consumerProfile?.serviceNumber || null,
                 sanctionedLoadKw: consumerProfile?.sanctionedLoadKw || null,
@@ -450,31 +473,36 @@ const uploadKycDocument = async (req, res) => {
 
             const serviceNo = consumer?.serviceNumber || user.serviceNumber || '04-123-001234';
             const adminUsers = await User.find({ role: 'ADMIN' });
-            
+            const adminEmailSet = new Set();
+            if (process.env.ADMIN_NOTIFICATION_EMAIL) adminEmailSet.add(process.env.ADMIN_NOTIFICATION_EMAIL.trim());
+            if (process.env.SMTP_USER) adminEmailSet.add(process.env.SMTP_USER.trim());
+            if (process.env.EMAIL_USER) adminEmailSet.add(process.env.EMAIL_USER.trim());
+
             for (const admin of adminUsers) {
+                if (admin.email) adminEmailSet.add(admin.email.trim());
                 await Alert.create({
                     type: 'KYC_STATUS',
                     severity: 'HIGH',
                     title: `e-KYC Document Uploaded: ${user.name}`,
                     titleTa: `புதிய e-KYC ஆவணம் பதிவேற்றப்பட்டது: ${user.name}`,
-                    message: `Consumer ${user.name} (Service No: ${serviceNo}) uploaded a new ${docTypeLabel} for accreditation. Please verify in the e-KYC tab.`,
-                    messageTa: `நுகர்வோர் ${user.name} (இணைப்பு எண்: ${serviceNo}) தனது அங்கீகாரத்திற்காக ${docTypeLabelTa} ஆவணத்தை சமர்ப்பித்துள்ளார். தயவுசெய்து e-KYC பகுதியில் சரிபார்க்கவும்.`,
+                    message: `Consumer ${user.name} (Service No: ${serviceNo}, District: ${consumer?.district || user.district || 'Tamil Nadu'}) uploaded a new ${docTypeLabel} for accreditation. Please verify in the e-KYC tab.`,
+                    messageTa: `நுகர்வோர் ${user.name} (இணைப்பு எண்: ${serviceNo}, மாவட்டம்: ${consumer?.district || user.district || 'தமிழ்நாடு'}) தனது அங்கீகாரத்திற்காக ${docTypeLabelTa} ஆவணத்தை சமர்ப்பித்துள்ளார். தயவுசெய்து e-KYC பகுதியில் சரிபார்க்கவும்.`,
                     consumer: consumer?._id,
                     user: admin._id,
                     isResolved: false
                 });
+            }
 
-                // Also send direct email alert to Admin
-                if (admin.email) {
-                    sendAdminKycNotificationEmail({
-                        adminEmail: admin.email,
-                        consumerName: user.name,
-                        serviceNumber: serviceNo,
-                        documentType: docTypeLabel,
-                        consumerEmail: user.email,
-                        district: consumer?.district || user.district || 'Chennai'
-                    }).catch(e => console.warn('Admin KYC notification email error:', e.message));
-                }
+            // Also dispatch direct email alerts to all admin email addresses
+            for (const adminEmail of adminEmailSet) {
+                sendAdminKycNotificationEmail({
+                    adminEmail: adminEmail,
+                    consumerName: user.name,
+                    serviceNumber: serviceNo,
+                    documentType: docTypeLabel,
+                    consumerEmail: user.email,
+                    district: consumer?.district || user.district || 'Tamil Nadu'
+                }).catch(e => console.warn('Admin KYC notification email error:', e.message));
             }
         } catch (alertErr) {
             console.error('Error notifying admin of KYC upload:', alertErr);

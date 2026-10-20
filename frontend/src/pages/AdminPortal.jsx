@@ -37,7 +37,8 @@ import {
     BarChart3,
     TrendingUp,
     Check,
-    UserCog
+    UserCog,
+    Mail
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import AdminAiAssistant from '../components/AdminAiAssistant';
@@ -181,9 +182,37 @@ export default function AdminPortal() {
     // Toast Notification
     const [toastMessage, setToastMessage] = useState('');
 
+    // Admin Live Action Notifications & Drawer
+    const [adminNotifications, setAdminNotifications] = useState({
+        alerts: [],
+        metrics: { pendingKycCount: 0, overdueBillsCount: 0, nearingDueCount: 0, totalUrgent: 0 },
+        overdueBills: [],
+        nearingDueBills: [],
+        pendingKycConsumers: []
+    });
+    const [showNotificationDrawer, setShowNotificationDrawer] = useState(false);
+    const [notificationTab, setNotificationTab] = useState('ALL'); // 'ALL' | 'KYC' | 'OVERDUE' | 'DUE'
+
     const showToast = (msg) => {
         setToastMessage(msg);
         setTimeout(() => setToastMessage(''), 4500);
+    };
+
+    const fetchAdminNotifications = async () => {
+        try {
+            const res = await api.get('/admin/notifications');
+            if (res.data?.success) {
+                setAdminNotifications(res.data.data || {
+                    alerts: [],
+                    metrics: { pendingKycCount: 0, overdueBillsCount: 0, nearingDueCount: 0, totalUrgent: 0 },
+                    overdueBills: [],
+                    nearingDueBills: [],
+                    pendingKycConsumers: []
+                });
+            }
+        } catch (err) {
+            console.error('Error fetching admin notifications:', err);
+        }
     };
 
     // Fetch initial KYC data
@@ -224,6 +253,7 @@ export default function AdminPortal() {
     useEffect(() => {
         fetchAdminPortalData();
         fetchBillsData();
+        fetchAdminNotifications();
     }, []);
 
     // Reset document index whenever selected consumer changes
@@ -335,7 +365,7 @@ export default function AdminPortal() {
     const handleSendReminders = async () => {
         setSendingReminders(true);
         try {
-            const res = await api.post('/admin/bills/send-reminders');
+            const res = await api.post('/admin/bills/send-reminders', { force: true });
             if (res.data?.success) {
                 const count = res.data.count || 0;
                 if (count === 0) {
@@ -344,12 +374,58 @@ export default function AdminPortal() {
                     showToast(res.data.message || 'Due date reminders dispatched.');
                 }
                 fetchBillsData();
+                fetchAdminNotifications();
             }
         } catch (err) {
             console.error('Reminder error:', err);
             showToast(err.response?.data?.message || 'Failed to send reminders.');
         } finally {
             setSendingReminders(false);
+        }
+    };
+
+    // Send Single Consumer Due Date Reminder (In-App Alert + Email)
+    const handleSendSingleReminder = async (bill) => {
+        setActionLoading(true);
+        try {
+            const billId = bill._id || bill.id;
+            const res = await api.post(`/admin/bills/${billId}/send-reminder`);
+            if (res.data?.success) {
+                showToast(language === 'ta'
+                    ? `${bill.userName} அவர்களுக்கு கடைசி நாள் நினைவூட்டல் மின்னஞ்சல் & அறிவிப்பு அனுப்பப்பட்டது.`
+                    : `Due date reminder alert & email sent to ${bill.userName}.`);
+                fetchBillsData();
+                fetchAdminNotifications();
+            }
+        } catch (err) {
+            console.error('Single reminder error:', err);
+            showToast(err.response?.data?.message || 'Failed to dispatch due date reminder.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    // Impose Late Surcharge on Overdue Consumer Bill (In-App Alert + Fine Notice Email)
+    const handleDirectOverdueFine = async (bill) => {
+        setActionLoading(true);
+        try {
+            const billId = bill._id || bill.id;
+            const res = await api.put(`/admin/bills/${billId}/fine`, {
+                fineAmount: bill.fineAmount || 150,
+                reason: 'TANGEDCO Late Payment Surcharge (LPSC) for crossing statutory due date'
+            });
+            if (res.data?.success) {
+                showToast(language === 'ta'
+                    ? `${bill.userName} அவர்களுக்கு தாமத அபராதம் விதிக்கப்பட்டு முறைப்படி அறிவிப்பு & மின்னஞ்சல் அனுப்பப்பட்டது.`
+                    : `Late surcharge imposed and notice emailed to ${bill.userName}.`);
+                fetchBillsData();
+                fetchAdminNotifications();
+            }
+        } catch (err) {
+            console.error('Direct fine error:', err);
+            showToast(err.response?.data?.message || 'Failed to impose overdue fine.');
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -518,7 +594,27 @@ export default function AdminPortal() {
                         {activeTab === 'GRID_ANALYTICS' && (language === 'ta' ? 'நேரடி கிரிட் தேவை (MW), 38 மாவட்ட மின்கட்டண வசூல் விகிதம் & புதுப்பிக்கத்தக்க மின்சாரம்' : 'Real-time 230V/400kV transmission grid load, 38-district telemetry, and green energy mix')}
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                    {/* Live Admin Action Alerts Bell Button */}
+                    <button
+                        type="button"
+                        onClick={() => setShowNotificationDrawer(!showNotificationDrawer)}
+                        className={`relative px-3.5 py-1.5 rounded-xl border font-bold text-xs flex items-center gap-2 transition cursor-pointer ${
+                            (adminNotifications.metrics?.totalUrgent || 0) > 0
+                                ? 'bg-red-500/20 border-red-500/50 text-red-300 hover:bg-red-500/30 ring-2 ring-red-500/30'
+                                : 'bg-panel border-panelBorder text-slate-300 hover:text-white hover:border-gold-500/50'
+                        }`}
+                        title="Admin Action Alerts Center"
+                    >
+                        <Bell size={15} className={(adminNotifications.metrics?.totalUrgent || 0) > 0 ? 'text-red-400 animate-bounce' : 'text-slate-400'} />
+                        <span>{language === 'ta' ? 'அறிவிப்புகள்' : 'Alerts'}</span>
+                        {(adminNotifications.metrics?.totalUrgent || 0) > 0 && (
+                            <span className="px-1.5 py-0.2 rounded-full bg-red-600 text-white text-[10px] font-black">
+                                {adminNotifications.metrics.totalUrgent}
+                            </span>
+                        )}
+                    </button>
+
                     <a
                         href="https://www.tnebnet.org/awp/login"
                         target="_blank"
@@ -533,6 +629,255 @@ export default function AdminPortal() {
                     </span>
                 </div>
             </div>
+
+            {/* Live Admin Action Alerts Drawer */}
+            {showNotificationDrawer && (
+                <div className="p-5 mb-6 rounded-2xl bg-panel border-2 border-gold-500/40 shadow-2xl relative animate-fadeIn">
+                    <div className="flex items-center justify-between pb-3 border-b border-panelBorder mb-4">
+                        <div className="flex items-center gap-2.5">
+                            <div className="p-2 rounded-xl bg-gold-500/15 border border-gold-500/30 text-gold-400">
+                                <Bell size={18} />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-white text-sm sm:text-base flex items-center gap-2">
+                                    <span>{language === 'ta' ? 'TANGEDCO நிர்வாக அறிவிப்பு & நடவடிக்கை மையம்' : 'TANGEDCO Executive Action & Notification Hub'}</span>
+                                    {(adminNotifications.metrics?.totalUrgent || 0) > 0 && (
+                                        <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[11px] font-bold border border-red-500/40">
+                                            {adminNotifications.metrics.totalUrgent} {language === 'ta' ? 'அவசர நிலுவைகள்' : 'Actionable Items'}
+                                        </span>
+                                    )}
+                                </h3>
+                                <p className="text-slate-400 text-xs mt-0.5">
+                                    {language === 'ta' 
+                                        ? 'நுகர்வோர் ஆவண பதிவேற்றங்கள், தாமத அபராதங்கள் மற்றும் கடைசி நாள் நினைவூட்டல் நேரடி நடவடிக்கைகள்.' 
+                                        : 'Real-time telemetry on consumer e-KYC uploads, overdue surcharges, and approaching due date notices.'}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setShowNotificationDrawer(false)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-darker transition cursor-pointer"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+
+                    {/* Filter Tabs */}
+                    <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 text-xs font-bold">
+                        <button
+                            type="button"
+                            onClick={() => setNotificationTab('ALL')}
+                            className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
+                                notificationTab === 'ALL'
+                                    ? 'bg-gold-500 text-darker font-black'
+                                    : 'bg-dark hover:bg-darker text-slate-300 border border-panelBorder'
+                            }`}
+                        >
+                            {language === 'ta' ? 'அனைத்தும்' : 'All Action Items'} ({adminNotifications.metrics?.totalUrgent || 0})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setNotificationTab('KYC')}
+                            className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                                notificationTab === 'KYC'
+                                    ? 'bg-blue-500 text-white font-black'
+                                    : 'bg-dark hover:bg-darker text-slate-300 border border-panelBorder'
+                            }`}
+                        >
+                            <FileText size={13} />
+                            <span>{language === 'ta' ? 'இ-கேஒய்சி ஆவணங்கள்' : 'e-KYC Uploads'}</span>
+                            <span className="px-1.5 py-0.2 rounded-full bg-blue-500/30 text-[10px]">
+                                {adminNotifications.pendingKycConsumers?.length || 0}
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setNotificationTab('OVERDUE')}
+                            className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                                notificationTab === 'OVERDUE'
+                                    ? 'bg-red-500 text-white font-black'
+                                    : 'bg-dark hover:bg-darker text-slate-300 border border-panelBorder'
+                            }`}
+                        >
+                            <ShieldAlert size={13} />
+                            <span>{language === 'ta' ? 'தாமத அபராதங்கள்' : 'Overdue Surcharges'}</span>
+                            <span className="px-1.5 py-0.2 rounded-full bg-red-500/30 text-[10px]">
+                                {adminNotifications.overdueBills?.length || 0}
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setNotificationTab('DUE')}
+                            className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                                notificationTab === 'DUE'
+                                    ? 'bg-amber-500 text-darker font-black'
+                                    : 'bg-dark hover:bg-darker text-slate-300 border border-panelBorder'
+                            }`}
+                        >
+                            <Bell size={13} />
+                            <span>{language === 'ta' ? 'கடைசி நாள் நினைவூட்டல்' : 'Due Reminders (≤3d)'}</span>
+                            <span className="px-1.5 py-0.2 rounded-full bg-amber-500/30 text-[10px]">
+                                {adminNotifications.nearingDueBills?.length || 0}
+                            </span>
+                        </button>
+                    </div>
+
+                    {/* Notification Cards List */}
+                    <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                        {/* Section 1: Pending KYC Consumers */}
+                        {(notificationTab === 'ALL' || notificationTab === 'KYC') && adminNotifications.pendingKycConsumers?.map((c) => (
+                            <div key={`kyc-${c._id}`} className="p-3.5 rounded-xl bg-dark border border-blue-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-blue-500/60 transition">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                                            📄 {language === 'ta' ? 'புதிய ஆவணம்' : 'e-KYC Document Upload'}
+                                        </span>
+                                        <span className="font-bold text-white text-sm">{c.user?.name || 'Consumer'}</span>
+                                        <span className="text-slate-400 text-xs">({c.user?.email})</span>
+                                    </div>
+                                    <p className="text-xs text-slate-300 flex items-center gap-2 flex-wrap">
+                                        <span>Service No: <strong className="text-gold-400 font-mono">{c.serviceNumber}</strong></span>
+                                        <span>•</span>
+                                        <span className="text-amber-300 flex items-center gap-1">
+                                            <MapPin size={11} className="text-gold-400" />
+                                            {formatDistrict(c.district || c.user?.district, language)}
+                                        </span>
+                                        <span>•</span>
+                                        <span className="text-slate-400">{getConsumerDocs(c).length} file(s) attached</span>
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setActiveTab('VERIFICATION');
+                                        setSelectedConsumer(c);
+                                        setShowNotificationDrawer(false);
+                                    }}
+                                    className="px-3 py-1.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1 self-start sm:self-auto shrink-0 shadow-sm"
+                                >
+                                    <Eye size={13} />
+                                    <span>{language === 'ta' ? 'ஆவணத்தை ஆய்வு செய்' : 'Inspect Document'}</span>
+                                </button>
+                            </div>
+                        ))}
+
+                        {/* Section 2: Overdue Consumers */}
+                        {(notificationTab === 'ALL' || notificationTab === 'OVERDUE') && adminNotifications.overdueBills?.map((b) => (
+                            <div key={`overdue-${b._id}`} className="p-3.5 rounded-xl bg-dark border border-red-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-red-500/60 transition">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/40 flex items-center gap-1">
+                                            <ShieldAlert size={11} /> {language === 'ta' ? 'தாமத அபராதம் தேவை' : 'OVERDUE BILL'}
+                                        </span>
+                                        <span className="font-bold text-white text-sm">{b.consumer?.user?.name || 'Consumer'}</span>
+                                        <span className="text-red-400 font-mono font-bold text-xs">₹{b.totalAmount?.toLocaleString()}</span>
+                                    </div>
+                                    <p className="text-xs text-slate-300 flex items-center gap-2 flex-wrap">
+                                        <span>Service No: <strong className="text-gold-400 font-mono">{b.consumer?.serviceNumber || b.serviceNumber}</strong></span>
+                                        <span>•</span>
+                                        <span className="text-amber-300 flex items-center gap-1">
+                                            <MapPin size={11} className="text-gold-400" />
+                                            {formatDistrict(b.consumer?.district || b.consumer?.user?.district, language)}
+                                        </span>
+                                        <span>•</span>
+                                        <span className="text-red-400 font-medium">Due Date: {new Date(b.dueDate).toLocaleDateString('en-IN')} (Overdue)</span>
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    disabled={actionLoading}
+                                    onClick={() => handleDirectOverdueFine({
+                                        ...b,
+                                        userName: b.consumer?.user?.name || 'Consumer',
+                                        totalPayable: b.totalAmount + (b.fineAmount || 150)
+                                    })}
+                                    className="px-3 py-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 text-red-300 text-xs font-bold transition cursor-pointer flex items-center gap-1 self-start sm:self-auto shrink-0 shadow-sm"
+                                >
+                                    <ShieldAlert size={13} className="text-red-400" />
+                                    <span>{language === 'ta' ? 'அபராதம் & அறிவிப்பு அனுப்பு' : '⚡ Impose Fine & Email'}</span>
+                                </button>
+                            </div>
+                        ))}
+
+                        {/* Section 3: Nearing Due Consumers */}
+                        {(notificationTab === 'ALL' || notificationTab === 'DUE') && adminNotifications.nearingDueBills?.map((b) => {
+                            const diff = Math.max(1, Math.ceil((new Date(b.dueDate) - new Date()) / (1000 * 60 * 60 * 24)));
+                            return (
+                                <div key={`due-${b._id}`} className="p-3.5 rounded-xl bg-dark border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-amber-500/60 transition">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                                                <Clock size={11} /> {language === 'ta' ? 'கடைசி நாள் எச்சரிக்கை' : 'DUE SOON'} ({diff}d)
+                                            </span>
+                                            <span className="font-bold text-white text-sm">{b.consumer?.user?.name || 'Consumer'}</span>
+                                            <span className="text-amber-400 font-mono font-bold text-xs">₹{b.totalAmount?.toLocaleString()}</span>
+                                        </div>
+                                        <p className="text-xs text-slate-300 flex items-center gap-2 flex-wrap">
+                                            <span>Service No: <strong className="text-gold-400 font-mono">{b.consumer?.serviceNumber || b.serviceNumber}</strong></span>
+                                            <span>•</span>
+                                            <span className="text-amber-300 flex items-center gap-1">
+                                                <MapPin size={11} className="text-gold-400" />
+                                                {formatDistrict(b.consumer?.district || b.consumer?.user?.district, language)}
+                                            </span>
+                                            <span>•</span>
+                                            <span className="text-amber-300/80">Due Date: {new Date(b.dueDate).toLocaleDateString('en-IN')}</span>
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        disabled={actionLoading}
+                                        onClick={() => handleSendSingleReminder({
+                                            ...b,
+                                            userName: b.consumer?.user?.name || 'Consumer'
+                                        })}
+                                        className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-bold transition cursor-pointer flex items-center gap-1 self-start sm:self-auto shrink-0 shadow-sm"
+                                    >
+                                        <Bell size={13} className="text-amber-400" />
+                                        <span>{language === 'ta' ? 'நினைவூட்டல் அனுப்பு' : '📩 Send Reminder & Email'}</span>
+                                    </button>
+                                </div>
+                            );
+                        })}
+
+                        {/* Empty state */}
+                        {(!adminNotifications.pendingKycConsumers?.length && !adminNotifications.overdueBills?.length && !adminNotifications.nearingDueBills?.length) && (
+                            <div className="p-8 text-center text-slate-400 text-xs">
+                                <CheckCircle2 size={24} className="mx-auto mb-2 text-emerald-400" />
+                                <p className="font-bold text-slate-200">{language === 'ta' ? 'அனைத்து நுகர்வோர் கணக்குகளும் சீராக உள்ளன!' : 'All Consumer Accounts are in Good Standing!'}</p>
+                                <p className="mt-1 text-slate-500">{language === 'ta' ? 'நிலுவையில் உள்ள ஆவணங்கள் அல்லது அபராத எச்சரிக்கைகள் எதுவும் இல்லை.' : 'No pending e-KYC uploads or urgent billing actions requiring intervention.'}</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Bottom Quick Batch Actions */}
+                    <div className="mt-4 pt-3 border-t border-panelBorder flex items-center justify-between flex-wrap gap-2 text-xs">
+                        <span className="text-slate-400">
+                            {language === 'ta' ? 'மொத்த அவசர நடவடிக்கைகள்:' : 'Batch Actions:'}
+                        </span>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                disabled={scanningFines}
+                                onClick={handleRunOverdueScan}
+                                className="px-3 py-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 font-bold cursor-pointer transition flex items-center gap-1"
+                            >
+                                <ShieldAlert size={13} />
+                                <span>{language === 'ta' ? 'அனைத்து அபராதங்களையும் விதிக்க' : '⚡ Impose All Overdue Fines'}</span>
+                            </button>
+                            <button
+                                type="button"
+                                disabled={sendingReminders}
+                                onClick={handleSendReminders}
+                                className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-bold cursor-pointer transition flex items-center gap-1"
+                            >
+                                <Bell size={13} />
+                                <span>{language === 'ta' ? 'அனைவருக்கும் நினைவூட்டல் அனுப்ப' : '📩 Dispatch All Due Reminders'}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* TAB 1: BILLING & PAYMENT MANAGEMENT */}
             {activeTab === 'BILLING' && (
@@ -873,6 +1218,34 @@ export default function AdminPortal() {
                                                                 </>
                                                             ) : b.status !== 'PAID' ? (
                                                                 <>
+                                                                    {/* Action for Overdue Consumers */}
+                                                                    {b.status === 'OVERDUE' && (
+                                                                        <button
+                                                                            type="button"
+                                                                            disabled={actionLoading}
+                                                                            onClick={() => handleDirectOverdueFine(b)}
+                                                                            className="px-2.5 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 text-red-300 text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-sm"
+                                                                            title="Impose late fine & email statutory warning to consumer"
+                                                                        >
+                                                                            <ShieldAlert size={12} className="text-red-400" />
+                                                                            <span>{language === 'ta' ? 'அபராதம் & அறிவிப்பு' : 'Impose Fine & Email'}</span>
+                                                                        </button>
+                                                                    )}
+
+                                                                    {/* Action for Due Reminder Consumers */}
+                                                                    {(b.isNearingDue || (b.daysRemaining >= 0 && b.daysRemaining <= 3)) && (
+                                                                        <button
+                                                                            type="button"
+                                                                            disabled={actionLoading}
+                                                                            onClick={() => handleSendSingleReminder(b)}
+                                                                            className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-sm"
+                                                                            title="Send approaching due date reminder alert & email to consumer"
+                                                                        >
+                                                                            <Bell size={12} className="text-amber-400" />
+                                                                            <span>{language === 'ta' ? 'நினைவூட்டல் அனுப்பு' : 'Send Due Reminder'}</span>
+                                                                        </button>
+                                                                    )}
+
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => handleAdminVerifyPayment(b, 'APPROVE')}
@@ -1084,6 +1457,17 @@ export default function AdminPortal() {
                                                     <td className="p-4">
                                                         <p className="font-bold text-white text-sm">{c.user?.name || 'N/A'}</p>
                                                         <p className="text-slate-400 text-xs">{c.user?.email || 'N/A'}</p>
+                                                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                                            <span className="inline-flex items-center gap-1 text-[11px] text-amber-300 font-semibold">
+                                                                <MapPin size={10} className="text-gold-400 shrink-0" />
+                                                                {formatDistrict(c.district || c.user?.district, language)}
+                                                            </span>
+                                                            {(c.phone || c.user?.phone) && (
+                                                                <span className="text-[10px] text-slate-400 font-mono">
+                                                                    • {c.phone || c.user?.phone}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         {(() => {
                                                             const cBill = bills.find(b => b.consumerId === c._id || b.userId === c.user?._id || b.userEmail === c.user?.email || b.serviceNumber === c.serviceNumber);
                                                             if (!cBill) return null;

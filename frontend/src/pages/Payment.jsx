@@ -26,6 +26,52 @@ import {
 
 const TANGEDCO_PAYMENT_URL = 'https://www.tnebnet.org/awp/login';
 
+const TN_DISTRICTS_MAP_TA = {
+    'Ariyalur': 'அரியலூர்',
+    'Chengalpattu': 'செங்கல்பட்டு',
+    'Chennai': 'சென்னை',
+    'Coimbatore': 'கோயம்புத்தூர்',
+    'Cuddalore': 'கடலூர்',
+    'Dharmapuri': 'தருமபுரி',
+    'Dindigul': 'திண்டுக்கல்',
+    'Erode': 'ஈரோடு',
+    'Kallakurichi': 'கள்ளக்குறிச்சி',
+    'Kancheepuram': 'காஞ்சிபுரம்',
+    'Karur': 'கரூர்',
+    'Krishnagiri': 'கிருஷ்ணகிரி',
+    'Madurai': 'மதுரை',
+    'Mayiladuthurai': 'மயிலாடுதுறை',
+    'Nagapattinam': 'நாகப்பட்டினம்',
+    'Kanniyakumari': 'கன்னியாகுமரி',
+    'Namakkal': 'நாமக்கல்',
+    'Perambalur': 'பெரம்பலூர்',
+    'Pudukkottai': 'புதுக்கோட்டை',
+    'Ramanathapuram': 'ராமநாதபுரம்',
+    'Ranipet': 'ராணிப்பேட்டை',
+    'Salem': 'சேலம்',
+    'Sivaganga': 'சிவகங்கை',
+    'Tenkasi': 'தென்காசி',
+    'Thanjavur': 'தஞ்சாவூர்',
+    'Theni': 'தேனி',
+    'Thoothukudi': 'தூத்துக்குடி',
+    'Tiruchirappalli': 'திருச்சிராப்பள்ளி',
+    'Tirunelveli': 'திருநெல்வேலி',
+    'Tirupathur': 'திருப்பத்தூர்',
+    'Tiruppur': 'திருப்பூர்',
+    'Tiruvallur': 'திருவள்ளூர்',
+    'Tiruvannamalai': 'திருவண்ணாமலை',
+    'Tiruvarur': 'திருவாரூர்',
+    'Vellore': 'வேலூர்',
+    'Viluppuram': 'விழுப்புரம்',
+    'Virudhunagar': 'விருதுநகர்'
+};
+
+const formatDistrict = (district, lang) => {
+    if (!district) return lang === 'ta' ? 'சென்னை' : 'Chennai';
+    if (lang === 'ta') return TN_DISTRICTS_MAP_TA[district] || district;
+    return district;
+};
+
 export default function Payment() {
     const { user } = useContext(AuthContext);
     const { language, t } = useLanguage();
@@ -193,7 +239,7 @@ export default function Payment() {
                             <span className="text-slate-400 text-[11px] block font-sans">
                                 {language === 'ta' ? 'மின் மாவட்டம் / வட்டம்:' : 'District / Region:'}
                             </span>
-                            <span className="text-white font-bold text-sm font-sans block mt-0.5">{user?.district || 'Chennai'}</span>
+                            <span className="text-white font-bold text-sm font-sans block mt-0.5">{formatDistrict(user?.district, language)}</span>
                         </div>
 
                         <div className="p-3 bg-darker rounded-xl border border-panelBorder">

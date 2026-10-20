@@ -62,7 +62,7 @@ const getAllConsumers = async (req, res, next) => {
         }
 
         let consumers = await Consumer.find(filter)
-            .populate('user', 'name email role verificationStatus kycDocuments connectionType createdAt isActive district')
+            .populate('user', 'name email role verificationStatus kycDocuments connectionType createdAt isActive district phone address')
             .sort({ createdAt: -1 });
 
         // Client search filter (by name, email, service number)
@@ -91,7 +91,7 @@ const getAllConsumers = async (req, res, next) => {
 const getPendingVerifications = async (req, res, next) => {
     try {
         const pending = await Consumer.find({ verificationStatus: 'PENDING' })
-            .populate('user', 'name email role verificationStatus kycDocuments connectionType createdAt')
+            .populate('user', 'name email role verificationStatus kycDocuments connectionType createdAt district phone address')
             .sort({ updatedAt: -1 });
 
         res.status(200).json({
@@ -450,14 +450,25 @@ const sendDueDateReminders = async (req, res, next) => {
         const futureLimit = new Date();
         futureLimit.setDate(now.getDate() + 5);
 
-        const approachingBills = await Bill.find({
+        let approachingBills = await Bill.find({
             status: 'UNPAID',
             dueDate: { $gte: now, $lte: futureLimit },
-            dueAlertSent: { $ne: true }
+            ...(req.body.force ? {} : { dueAlertSent: { $ne: true } })
         }).populate({
             path: 'consumer',
             populate: { path: 'user' }
         });
+
+        // Fallback: If all nearing bills already received alert once, still include them so admin can re-dispatch
+        if (approachingBills.length === 0) {
+            approachingBills = await Bill.find({
+                status: 'UNPAID',
+                dueDate: { $gte: now, $lte: futureLimit }
+            }).populate({
+                path: 'consumer',
+                populate: { path: 'user' }
+            });
+        }
 
         let sentCount = 0;
 
@@ -1033,27 +1044,41 @@ const getAdminNotifications = async (req, res, next) => {
 
         const pendingKycCount = await Consumer.countDocuments({ verificationStatus: 'PENDING' });
         const now = new Date();
-        const overdueBillsCount = await Bill.countDocuments({
+        const overdueBills = await Bill.find({
             status: { $ne: 'PAID' },
             dueDate: { $lt: now }
-        });
+        }).populate({
+            path: 'consumer',
+            populate: { path: 'user', select: 'name email district phone' }
+        }).sort({ dueDate: 1 });
+
         const futureLimit = new Date();
         futureLimit.setDate(now.getDate() + 5);
-        const nearingDueCount = await Bill.countDocuments({
+        const nearingDueBills = await Bill.find({
             status: 'UNPAID',
             dueDate: { $gte: now, $lte: futureLimit }
-        });
+        }).populate({
+            path: 'consumer',
+            populate: { path: 'user', select: 'name email district phone' }
+        }).sort({ dueDate: 1 });
+
+        const pendingKycConsumers = await Consumer.find({ verificationStatus: 'PENDING' })
+            .populate('user', 'name email district phone kycDocuments connectionType')
+            .sort({ updatedAt: -1 });
 
         res.status(200).json({
             success: true,
             data: {
                 alerts,
                 metrics: {
-                    pendingKycCount,
-                    overdueBillsCount,
-                    nearingDueCount,
-                    totalUrgent: pendingKycCount + overdueBillsCount + nearingDueCount
-                }
+                    pendingKycCount: pendingKycConsumers.length,
+                    overdueBillsCount: overdueBills.length,
+                    nearingDueCount: nearingDueBills.length,
+                    totalUrgent: pendingKycConsumers.length + overdueBills.length + nearingDueBills.length
+                },
+                overdueBills,
+                nearingDueBills,
+                pendingKycConsumers
             }
         });
     } catch (error) {
