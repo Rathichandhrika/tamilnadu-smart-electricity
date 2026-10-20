@@ -36,11 +36,13 @@ import {
     Flame,
     BarChart3,
     TrendingUp,
-    Check
+    Check,
+    UserCog
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import AdminAiAssistant from '../components/AdminAiAssistant';
 import KycDocumentViewer from '../components/KycDocumentViewer';
+import EditProfileModal from '../components/EditProfileModal';
 
 const TN_DISTRICTS_MAP_TA = {
     'Ariyalur': 'அரியலூர்',
@@ -159,6 +161,7 @@ export default function AdminPortal() {
     const [rejectionModalConsumer, setRejectionModalConsumer] = useState(null);
     const [rejectionRemarks, setRejectionRemarks] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
+    const [editingConsumerProfile, setEditingConsumerProfile] = useState(null);
 
     // Billing & Revenue States
     const [bills, setBills] = useState([]);
@@ -238,7 +241,13 @@ export default function AdminPortal() {
             });
 
             if (data.success) {
-                showToast(`Consumer ${newStatus.toLowerCase()} successfully.`);
+                if (newStatus === 'APPROVED') {
+                    showToast(language === 'ta' ? 'இ-கேஒய்சி வெற்றிகரமாக அங்கீகரிக்கப்பட்டது' : 'ekyc approved successfully');
+                } else if (newStatus === 'REJECTED') {
+                    showToast(language === 'ta' ? 'இ-கேஒய்சி விண்ணப்பம் நிராகரிக்கப்பட்டது' : 'eKYC application rejected.');
+                } else {
+                    showToast(`Consumer ${newStatus.toLowerCase()} successfully.`);
+                }
                 setConsumers(prev => prev.map(c => {
                     if (c._id === consumerId) {
                         return {
@@ -250,10 +259,8 @@ export default function AdminPortal() {
                     return c;
                 }));
 
-                if (selectedConsumer && selectedConsumer._id === consumerId) {
-                    setSelectedConsumer(prev => ({ ...prev, verificationStatus: newStatus }));
-                }
-
+                // Immediately close the inspection pop up window
+                setSelectedConsumer(null);
                 setRejectionModalConsumer(null);
                 setRejectionRemarks('');
 
@@ -1539,9 +1546,20 @@ export default function AdminPortal() {
                                 <h3 className="text-base font-bold text-white">{selectedConsumer.user?.name}</h3>
                                 <p className="text-xs text-gold-400 font-mono">{selectedConsumer.serviceNumber}</p>
                             </div>
-                            <button onClick={() => setSelectedConsumer(null)} className="text-slate-400 hover:text-white">
-                                <X size={20} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingConsumerProfile(selectedConsumer)}
+                                    className="px-2.5 py-1 text-xs font-bold rounded-lg bg-gold-500/10 hover:bg-gold-500/20 text-gold-400 border border-gold-500/30 flex items-center gap-1.5 transition cursor-pointer"
+                                    title={language === 'ta' ? 'நுகர்வோர் விவரங்களைத் திருத்து' : 'Edit Consumer Profile'}
+                                >
+                                    <UserCog size={13} />
+                                    <span>{language === 'ta' ? 'விவரங்களைத் திருத்து' : 'Edit Profile'}</span>
+                                </button>
+                                <button onClick={() => setSelectedConsumer(null)} className="text-slate-400 hover:text-white p-1">
+                                    <X size={20} />
+                                </button>
+                            </div>
                         </div>
 
                         <div className="p-6 flex-1 overflow-y-auto space-y-4">
@@ -1658,6 +1676,26 @@ export default function AdminPortal() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Edit Consumer Profile Modal for Admin */}
+            {editingConsumerProfile && (
+                <EditProfileModal
+                    isOpen={Boolean(editingConsumerProfile)}
+                    onClose={() => setEditingConsumerProfile(null)}
+                    targetConsumer={editingConsumerProfile}
+                    onProfileUpdated={(updated) => {
+                        fetchAdminPortalData();
+                        fetchBillsData();
+                        if (selectedConsumer && selectedConsumer._id === editingConsumerProfile._id) {
+                            setSelectedConsumer(prev => ({
+                                ...prev,
+                                ...(updated.consumer || updated),
+                                user: { ...(prev.user || {}), ...(updated.user || updated) }
+                            }));
+                        }
+                    }}
+                />
             )}
         </div>
     );

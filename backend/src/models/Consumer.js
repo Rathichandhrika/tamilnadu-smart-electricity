@@ -24,6 +24,11 @@ const consumerSchema = new mongoose.Schema({
         default: 'Chennai',
         trim: true
     },
+    phone: {
+        type: String,
+        default: '',
+        trim: true
+    },
     address: {
         street: String,
         city: { type: String, default: 'Chennai' },

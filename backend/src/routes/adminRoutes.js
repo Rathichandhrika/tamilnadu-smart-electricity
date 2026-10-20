@@ -11,7 +11,11 @@ const {
     sendDueDateReminders,
     imposeManualFine,
     getAdminAiInsights,
-    verifyConsumerPayment
+    verifyConsumerPayment,
+    sendSingleBillReminder,
+    updateConsumerDistrict,
+    updateConsumerProfileAdmin,
+    getAdminNotifications
 } = require('../controllers/adminController');
 const { protect, admin } = require('../middleware/authMiddleware'); // Applying RBAC
 
@@ -20,6 +24,9 @@ router.use(protect, admin); // Secure all routes in this file for Admins
 // Dashboard & Consumer Data
 router.get('/stats', getSystemStats);
 router.get('/consumers', getAllConsumers);
+router.put('/consumer/:id/district', updateConsumerDistrict);
+router.put('/consumer/:id/profile', updateConsumerProfileAdmin);
+router.get('/notifications', getAdminNotifications);
 
 // KYC Verification Management
 router.get('/verifications/pending', getPendingVerifications);
@@ -30,6 +37,7 @@ router.put('/connection-type/:id', updateConnectionType);
 router.get('/bills', getAllBillsAdmin);
 router.post('/bills/check-overdue', checkAndApplyOverdueFines);
 router.post('/bills/send-reminders', sendDueDateReminders);
+router.post('/bills/:id/send-reminder', sendSingleBillReminder);
 router.post('/bills/:id/verify-payment', verifyConsumerPayment);
 router.put('/bills/:id/fine', imposeManualFine);
 

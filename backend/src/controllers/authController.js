@@ -6,7 +6,7 @@ const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 const { OAuth2Client } = require('google-auth-library');
-const { sendPasswordResetEmail } = require('../services/emailService');
+const { sendPasswordResetEmail, sendAdminKycNotificationEmail } = require('../services/emailService');
 
 // Google OAuth Client
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -247,6 +247,8 @@ const googleAuth = async (req, res) => {
                 tariffCategory = 'LT-5';
             }
 
+            const userDistrict = (req.body.district && req.body.district.trim()) ? req.body.district.trim() : 'Chennai';
+
             // Provision new User: KYC Status is strictly PENDING until document upload + admin approval
             user = await User.create({
                 name: displayName,
@@ -255,12 +257,11 @@ const googleAuth = async (req, res) => {
                 avatar: avatar,
                 role: 'CONSUMER',
                 connectionType: selectedConnectionType,
+                district: userDistrict,
                 verificationStatus: 'PENDING',
                 kycDocuments: [],
                 isActive: true
             });
-
-            const userDistrict = (req.body.district && req.body.district.trim()) ? req.body.district.trim() : 'Chennai';
 
             // Create Consumer Profile with provided Service Number, Category, Load & District
             await Consumer.create({
@@ -370,16 +371,26 @@ const getMe = async (req, res) => {
         const user = req.user;
         const consumerProfile = await Consumer.findOne({ user: user._id });
 
+        const addressObj = consumerProfile?.address || user.address || {
+            street: '',
+            city: user.district || 'Chennai',
+            district: user.district || 'Chennai',
+            pincode: ''
+        };
+
         res.json({
             success: true,
             data: {
                 _id: user._id,
                 name: user.name,
                 email: user.email,
+                phone: user.phone || consumerProfile?.phone || '',
                 role: user.role,
                 verificationStatus: user.verificationStatus || consumerProfile?.verificationStatus || 'PENDING',
                 connectionType: user.connectionType || consumerProfile?.connectionType || 'LT-1A_DOMESTIC',
                 district: user.district || consumerProfile?.district || 'Chennai',
+                address: addressObj,
+                pincode: addressObj.pincode || '',
                 kycDocuments: user.kycDocuments || consumerProfile?.kycDocuments || [],
                 serviceNumber: consumerProfile?.serviceNumber || null,
                 sanctionedLoadKw: consumerProfile?.sanctionedLoadKw || null,
@@ -452,6 +463,18 @@ const uploadKycDocument = async (req, res) => {
                     user: admin._id,
                     isResolved: false
                 });
+
+                // Also send direct email alert to Admin
+                if (admin.email) {
+                    sendAdminKycNotificationEmail({
+                        adminEmail: admin.email,
+                        consumerName: user.name,
+                        serviceNumber: serviceNo,
+                        documentType: docTypeLabel,
+                        consumerEmail: user.email,
+                        district: consumer?.district || user.district || 'Chennai'
+                    }).catch(e => console.warn('Admin KYC notification email error:', e.message));
+                }
             }
         } catch (alertErr) {
             console.error('Error notifying admin of KYC upload:', alertErr);
@@ -492,34 +515,29 @@ const deleteKycDocument = async (req, res) => {
         }
 
         const targetBase = path.basename(rawPath).toLowerCase();
-        const targetClean = rawPath.replace(/^https?:\/\/[^\/]+/, '').replace(/^\/+/, '');
+        const targetClean = rawPath.replace(/^https?:\/\/[^\/]+/, '').replace(/^\/+/, '').toLowerCase();
+        // Extract numeric sequence or hash (e.g. 28435613 or timestamp)
+        const targetNumberMatch = targetBase.match(/\d{6,}/)?.[0] || '';
 
-        // Match helper function supporting basename, relative path, or exact string
+        // Match helper function supporting basename, relative path, exact string, or numeric fragment
         const isMatch = (item) => {
             if (!item) return false;
             if (item === rawPath) return true;
-            if (path.basename(item).toLowerCase() === targetBase) return true;
-            const itemClean = item.replace(/^https?:\/\/[^\/]+/, '').replace(/^\/+/, '');
+            const itemBase = path.basename(item).toLowerCase();
+            if (itemBase === targetBase) return true;
+            const itemClean = item.replace(/^https?:\/\/[^\/]+/, '').replace(/^\/+/, '').toLowerCase();
             if (itemClean === targetClean) return true;
-            if (item.endsWith(targetBase)) return true;
+            if (item.endsWith(targetBase) || targetBase.endsWith(itemBase)) return true;
+            if (targetNumberMatch && itemBase.includes(targetNumberMatch)) return true;
             return false;
         };
 
         const consumer = await Consumer.findOne({ user: user._id });
 
-        const userHasDoc = (user.kycDocuments || []).some(isMatch);
-        const consumerHasDoc = (consumer?.kycDocuments || []).some(isMatch);
-
-        // Allow Admin to delete any consumer's document if needed, or verify user ownership
-        if (!userHasDoc && !consumerHasDoc && req.user.role !== 'ADMIN') {
-            return res.status(404).json({ 
-                success: false, 
-                message: 'Document not found in user records.' 
-            });
-        }
-
         // Remove from User document list
+        const initialUserCount = (user.kycDocuments || []).length;
         user.kycDocuments = (user.kycDocuments || []).filter(doc => !isMatch(doc));
+        user.markModified('kycDocuments');
         if (user.kycDocuments.length === 0 && user.verificationStatus !== 'APPROVED') {
             user.verificationStatus = 'PENDING';
         }
@@ -527,7 +545,8 @@ const deleteKycDocument = async (req, res) => {
 
         // Also remove from Consumer document list if present
         if (consumer && consumer.kycDocuments) {
-            consumer.kycDocuments = consumer.kycDocuments.filter(doc => !isMatch(doc));
+            consumer.kycDocuments = (consumer.kycDocuments || []).filter(doc => !isMatch(doc));
+            consumer.markModified('kycDocuments');
             if (consumer.kycDocuments.length === 0 && consumer.verificationStatus !== 'APPROVED') {
                 consumer.verificationStatus = 'PENDING';
             }
@@ -651,6 +670,143 @@ const resetPassword = async (req, res) => {
     }
 };
 
+// @desc    Update consumer profile (name, email, phone, address, district, pincode, service connection number)
+// @route   PUT /api/auth/profile
+// @access  Private
+const updateProfile = async (req, res) => {
+    try {
+        const { 
+            name, 
+            email, 
+            phone, 
+            address, 
+            street, 
+            city, 
+            district, 
+            pincode, 
+            serviceNumber, 
+            connectionType 
+        } = req.body;
+
+        const user = await User.findById(req.user._id);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User account not found.' });
+        }
+
+        // Validate unique email if changing email
+        if (email && email.toLowerCase().trim() !== user.email) {
+            const normalizedEmail = email.toLowerCase().trim();
+            const existingUser = await User.findOne({ email: normalizedEmail });
+            if (existingUser) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Email address is already in use by another account.' 
+                });
+            }
+            user.email = normalizedEmail;
+        }
+
+        if (name && name.trim()) user.name = name.trim();
+        if (phone !== undefined) user.phone = phone.trim();
+        if (district && district.trim()) user.district = district.trim();
+
+        // Address resolution
+        const streetVal = street || (typeof address === 'object' ? address.street : address) || user.address?.street || '';
+        const cityVal = city || (typeof address === 'object' ? address.city : null) || user.district || district || 'Chennai';
+        const districtVal = district || (typeof address === 'object' ? address.district : null) || user.district || 'Chennai';
+        const pincodeVal = pincode || (typeof address === 'object' ? address.pincode : null) || user.address?.pincode || '';
+
+        user.address = {
+            street: streetVal,
+            city: cityVal,
+            district: districtVal,
+            pincode: pincodeVal
+        };
+
+        if (connectionType) {
+            user.connectionType = connectionType;
+        }
+
+        await user.save();
+
+        // Update or create linked Consumer Profile
+        let consumer = await Consumer.findOne({ user: user._id });
+
+        if (serviceNumber && serviceNumber.trim()) {
+            const cleanServiceNo = serviceNumber.trim();
+            const existingConsumer = await Consumer.findOne({ 
+                serviceNumber: cleanServiceNo,
+                user: { $ne: user._id }
+            });
+            if (existingConsumer) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Service connection number ${cleanServiceNo} is already registered to another consumer.`
+                });
+            }
+            if (consumer) {
+                consumer.serviceNumber = cleanServiceNo;
+            }
+        }
+
+        if (consumer) {
+            consumer.district = districtVal;
+            consumer.phone = phone !== undefined ? phone.trim() : consumer.phone;
+            consumer.address = {
+                street: streetVal,
+                city: cityVal,
+                district: districtVal,
+                pincode: pincodeVal
+            };
+            if (connectionType) {
+                consumer.connectionType = connectionType;
+                consumer.tariffCategory = connectionType === 'LT-V_COMMERCIAL' ? 'LT-5' : (connectionType === 'LT-IIIB_INDUSTRIAL' ? 'LT-3B' : 'LT-1A');
+            }
+            await consumer.save();
+        } else if (serviceNumber && serviceNumber.trim()) {
+            consumer = await Consumer.create({
+                user: user._id,
+                serviceNumber: serviceNumber.trim(),
+                district: districtVal,
+                phone: phone !== undefined ? phone.trim() : '',
+                address: {
+                    street: streetVal,
+                    city: cityVal,
+                    district: districtVal,
+                    pincode: pincodeVal
+                },
+                connectionType: user.connectionType || 'LT-1A_DOMESTIC',
+                tariffCategory: user.connectionType === 'LT-V_COMMERCIAL' ? 'LT-5' : 'LT-1A',
+                verificationStatus: user.verificationStatus || 'PENDING'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Consumer profile updated successfully.',
+            data: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone || consumer?.phone || '',
+                district: user.district,
+                role: user.role,
+                verificationStatus: user.verificationStatus || consumer?.verificationStatus || 'PENDING',
+                connectionType: user.connectionType || consumer?.connectionType || 'LT-1A_DOMESTIC',
+                kycDocuments: user.kycDocuments || consumer?.kycDocuments || [],
+                serviceNumber: consumer?.serviceNumber || null,
+                address: consumer?.address || user.address,
+                pincode: pincodeVal,
+                sanctionedLoadKw: consumer?.sanctionedLoadKw || null,
+                avatar: user.avatar || null
+            }
+        });
+    } catch (error) {
+        console.error('Update Profile Error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 module.exports = { 
     registerUser, 
     loginUser, 
@@ -659,6 +815,7 @@ module.exports = {
     getMe, 
     uploadKycDocument,
     deleteKycDocument,
+    updateProfile,
     forgotPassword,
     resetPassword
 };

@@ -3,6 +3,7 @@ const Consumer = require('../models/Consumer');
 const IoTReading = require('../models/IoTReading');
 const Bill = require('../models/Bill');
 const Alert = require('../models/Alert');
+const { sendDueDateReminderEmail, sendOverdueFineNoticeEmail } = require('../services/emailService');
 
 // @desc    Get system-wide statistics for Admin Dashboard & Verification Portal
 // @route   GET /api/admin/stats
@@ -61,7 +62,7 @@ const getAllConsumers = async (req, res, next) => {
         }
 
         let consumers = await Consumer.find(filter)
-            .populate('user', 'name email role verificationStatus kycDocuments connectionType createdAt isActive')
+            .populate('user', 'name email role verificationStatus kycDocuments connectionType createdAt isActive district')
             .sort({ createdAt: -1 });
 
         // Client search filter (by name, email, service number)
@@ -259,7 +260,7 @@ const getAllBillsAdmin = async (req, res, next) => {
 
             const consumer = billObj.consumer || {};
             const user = consumer.user || {};
-            const userDistrict = user.district || consumer.district || consumer.address?.district || 'Chennai';
+            const userDistrict = consumer.district || consumer.address?.district || user.district || 'Chennai';
 
             return {
                 ...billObj,
@@ -403,6 +404,22 @@ const checkAndApplyOverdueFines = async (req, res, next) => {
                 bill.fineAlertSent = true;
                 await bill.save();
                 createdAlerts++;
+
+                // Dispatch Official Overdue Fine Notice Email to Consumer
+                if (user?.email) {
+                    sendOverdueFineNoticeEmail({
+                        toEmail: user.email,
+                        consumerName: user.name,
+                        serviceNumber: consumer?.serviceNumber || bill.serviceNumber || 'N/A',
+                        amount: bill.totalAmount,
+                        fineAmount: bill.fineAmount,
+                        totalPayable: bill.totalAmount + bill.fineAmount,
+                        billingMonth: bill.billingMonth,
+                        dueDate: new Date(bill.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+                        district: consumer?.district || user.district || 'Tamil Nadu',
+                        fineReason: bill.fineReason
+                    }).catch(e => console.warn('Overdue email notice error:', e.message));
+                }
             }
         }
 
@@ -475,6 +492,20 @@ const sendDueDateReminders = async (req, res, next) => {
             bill.dueAlertSent = true;
             await bill.save();
             sentCount++;
+
+            // Dispatch Official Approaching Due Date Reminder Email to Consumer
+            if (user?.email) {
+                sendDueDateReminderEmail({
+                    toEmail: user.email,
+                    consumerName: user.name,
+                    serviceNumber: consumer?.serviceNumber || 'N/A',
+                    amount: bill.totalAmount,
+                    dueDate: dueDateFormatted,
+                    daysLeft: daysLeft,
+                    billingMonth: bill.billingMonth,
+                    district: consumer?.district || user.district || 'Tamil Nadu'
+                }).catch(e => console.warn('Due reminder email error:', e.message));
+            }
         }
 
         const reminderMessage = sentCount === 0
@@ -533,6 +564,22 @@ const imposeManualFine = async (req, res, next) => {
                 bill: bill._id,
                 fineAmount: amount
             });
+
+            // Dispatch email notice to consumer
+            if (user?.email) {
+                sendOverdueFineNoticeEmail({
+                    toEmail: user.email,
+                    consumerName: user.name,
+                    serviceNumber: consumer?.serviceNumber || bill.serviceNumber || 'N/A',
+                    amount: bill.totalAmount,
+                    fineAmount: amount,
+                    totalPayable: bill.totalAmount + amount,
+                    billingMonth: bill.billingMonth,
+                    dueDate: new Date(bill.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+                    district: consumer?.district || user.district || 'Tamil Nadu',
+                    fineReason: bill.fineReason
+                }).catch(e => console.warn('Manual fine email notice error:', e.message));
+            }
         }
 
         res.status(200).json({
@@ -569,7 +616,7 @@ const getAdminAiInsights = async (req, res, next) => {
             const isNearing = b.status !== 'PAID' && daysRemaining >= 0 && daysRemaining <= 3;
             const consumer = b.consumer || {};
             const user = consumer.user || {};
-            const dist = user.district || consumer.district || consumer.address?.district || 'Chennai';
+            const dist = consumer.district || consumer.address?.district || user.district || 'Chennai';
 
             return {
                 id: b._id,
@@ -786,6 +833,233 @@ const verifyConsumerPayment = async (req, res, next) => {
         next(error);
     }
 };
+// @desc    Send reminder for a single bill to consumer (in-app alert + email)
+// @route   POST /api/admin/bills/:id/send-reminder
+// @access  Private/Admin
+const sendSingleBillReminder = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const bill = await Bill.findById(id).populate({
+            path: 'consumer',
+            populate: { path: 'user' }
+        });
+
+        if (!bill) {
+            return res.status(404).json({ success: false, message: 'Bill record not found.' });
+        }
+
+        const now = new Date();
+        const dueDateFormatted = new Date(bill.dueDate).toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
+        const diffTime = new Date(bill.dueDate) - now;
+        const daysLeft = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+        const consumer = bill.consumer;
+        const user = consumer?.user;
+        const dist = consumer?.district || user?.district || 'Tamil Nadu';
+
+        await Alert.create({
+            type: 'DUE_DATE_NEAR',
+            severity: 'HIGH',
+            title: `TANGEDCO Due Reminder (Due: ${dueDateFormatted})`,
+            titleTa: `கட்டணக் கடைசி நாள் நினைவூட்டல் (${dueDateFormatted})`,
+            message: `Official Reminder: Your electricity bill of ₹${bill.totalAmount.toLocaleString()} for ${bill.billingMonth} is due in ${daysLeft} days (${dueDateFormatted}). Settle online via TANGEDCO Quick Pay to prevent late payment surcharge.`,
+            messageTa: `அறிவிப்பு: உங்கள் ${bill.billingMonth} மாத மின்கட்டணம் ₹${bill.totalAmount.toLocaleString()} செலுத்த இன்னும் ${daysLeft} நாட்களே உள்ளன (கடைசி நாள்: ${dueDateFormatted}). தாமத அபராதக் கட்டணத்தைத் தவிர்க்க உடனே செலுத்தவும்.`,
+            consumer: consumer?._id,
+            user: user?._id,
+            bill: bill._id,
+            fineAmount: 150
+        });
+
+        bill.dueAlertSent = true;
+        await bill.save();
+
+        if (user?.email) {
+            sendDueDateReminderEmail({
+                toEmail: user.email,
+                consumerName: user.name,
+                serviceNumber: consumer?.serviceNumber || 'N/A',
+                amount: bill.totalAmount,
+                dueDate: dueDateFormatted,
+                daysLeft: daysLeft,
+                billingMonth: bill.billingMonth,
+                district: dist
+            }).catch(e => console.warn('Single due reminder email error:', e.message));
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Due reminder notice and email dispatched to ${user?.name || 'Consumer'}.`,
+            data: bill
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Update consumer district
+// @route   PUT /api/admin/consumer/:id/district
+// @access  Private/Admin
+const updateConsumerDistrict = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { district } = req.body;
+
+        if (!district) {
+            return res.status(400).json({ success: false, message: 'District is required.' });
+        }
+
+        let consumer = await Consumer.findById(id).populate('user');
+        if (!consumer) {
+            consumer = await Consumer.findOne({ user: id }).populate('user');
+        }
+
+        if (!consumer) {
+            return res.status(404).json({ success: false, message: 'Consumer not found.' });
+        }
+
+        consumer.district = district.trim();
+        if (consumer.address) {
+            consumer.address.district = district.trim();
+            consumer.address.city = district.trim();
+        }
+        await consumer.save();
+
+        if (consumer.user) {
+            await User.findByIdAndUpdate(consumer.user._id, { district: district.trim() });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `District updated to ${district} for consumer ${consumer.serviceNumber}.`,
+            data: consumer
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Admin update consumer profile (name, email, phone, address, district, pincode, service connection number)
+// @route   PUT /api/admin/consumer/:id/profile
+// @access  Private/Admin
+const updateConsumerProfileAdmin = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { name, email, phone, street, district, pincode, serviceNumber } = req.body;
+
+        let consumer = await Consumer.findById(id).populate('user');
+        if (!consumer) {
+            consumer = await Consumer.findOne({ user: id }).populate('user');
+        }
+
+        if (!consumer) {
+            return res.status(404).json({ success: false, message: 'Consumer profile not found.' });
+        }
+
+        const user = consumer.user ? await User.findById(consumer.user._id) : null;
+
+        if (user) {
+            if (name && name.trim()) user.name = name.trim();
+            if (email && email.trim()) {
+                const normalizedEmail = email.trim().toLowerCase();
+                const conflict = await User.findOne({ email: normalizedEmail, _id: { $ne: user._id } });
+                if (conflict) {
+                    return res.status(400).json({ success: false, message: 'Email address already assigned to another user.' });
+                }
+                user.email = normalizedEmail;
+            }
+            if (phone !== undefined) user.phone = phone.trim();
+            if (district && district.trim()) user.district = district.trim();
+            user.address = {
+                street: street !== undefined ? street.trim() : (user.address?.street || ''),
+                city: district ? district.trim() : (user.address?.city || 'Chennai'),
+                district: district ? district.trim() : (user.address?.district || 'Chennai'),
+                pincode: pincode !== undefined ? pincode.trim() : (user.address?.pincode || '')
+            };
+            await user.save();
+        }
+
+        if (serviceNumber && serviceNumber.trim()) {
+            const cleanServiceNo = serviceNumber.trim();
+            const conflict = await Consumer.findOne({ serviceNumber: cleanServiceNo, _id: { $ne: consumer._id } });
+            if (conflict) {
+                return res.status(400).json({ success: false, message: `Service connection number ${cleanServiceNo} is already registered.` });
+            }
+            consumer.serviceNumber = cleanServiceNo;
+        }
+
+        if (phone !== undefined) consumer.phone = phone.trim();
+        if (district && district.trim()) consumer.district = district.trim();
+        consumer.address = {
+            street: street !== undefined ? street.trim() : (consumer.address?.street || ''),
+            city: district ? district.trim() : (consumer.address?.city || 'Chennai'),
+            district: district ? district.trim() : (consumer.address?.district || 'Chennai'),
+            pincode: pincode !== undefined ? pincode.trim() : (consumer.address?.pincode || '')
+        };
+        await consumer.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Consumer profile updated successfully.',
+            data: {
+                consumer,
+                user
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Get Admin Live Notifications and Action Alerts
+// @route   GET /api/admin/notifications
+// @access  Private/Admin
+const getAdminNotifications = async (req, res, next) => {
+    try {
+        const alerts = await Alert.find({
+            $or: [
+                { user: req.user._id },
+                { type: 'KYC_STATUS' },
+                { severity: 'HIGH' }
+            ]
+        })
+        .populate('consumer', 'serviceNumber district connectionType')
+        .populate('user', 'name email role')
+        .populate('bill', 'billingMonth totalAmount fineAmount dueDate status')
+        .sort({ createdAt: -1 })
+        .limit(50);
+
+        const pendingKycCount = await Consumer.countDocuments({ verificationStatus: 'PENDING' });
+        const now = new Date();
+        const overdueBillsCount = await Bill.countDocuments({
+            status: { $ne: 'PAID' },
+            dueDate: { $lt: now }
+        });
+        const futureLimit = new Date();
+        futureLimit.setDate(now.getDate() + 5);
+        const nearingDueCount = await Bill.countDocuments({
+            status: 'UNPAID',
+            dueDate: { $gte: now, $lte: futureLimit }
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                alerts,
+                metrics: {
+                    pendingKycCount,
+                    overdueBillsCount,
+                    nearingDueCount,
+                    totalUrgent: pendingKycCount + overdueBillsCount + nearingDueCount
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
 
 module.exports = { 
     getSystemStats, 
@@ -798,5 +1072,9 @@ module.exports = {
     sendDueDateReminders,
     imposeManualFine,
     getAdminAiInsights,
-    verifyConsumerPayment
+    verifyConsumerPayment,
+    sendSingleBillReminder,
+    updateConsumerDistrict,
+    updateConsumerProfileAdmin,
+    getAdminNotifications
 };

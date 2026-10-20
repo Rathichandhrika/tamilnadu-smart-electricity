@@ -20,12 +20,17 @@ import {
     Trash2,
     ExternalLink,
     X,
-    LayoutDashboard
+    LayoutDashboard,
+    UserCog
 } from 'lucide-react';
+import EditProfileModal from '../components/EditProfileModal';
 
 export default function Dashboard() {
     const { user, setUser } = useContext(AuthContext);
     const { t, language } = useLanguage();
+
+    // Profile Edit Modal State
+    const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
     // KYC Upload & File Management states
     const [file, setFile] = useState(null);
@@ -162,20 +167,35 @@ export default function Dashboard() {
         setUploadError('');
         setUploadSuccess('');
 
+        const targetBase = docPath.split('/').pop().toLowerCase();
+        const numberMatch = targetBase.match(/\d{6,}/)?.[0] || '';
+
+        const filterOut = (d) => {
+            if (!d) return false;
+            if (d === docPath) return false;
+            const b = d.split('/').pop().toLowerCase();
+            if (b === targetBase) return false;
+            if (numberMatch && b.includes(numberMatch)) return false;
+            return true;
+        };
+
         try {
             const { data } = await api.delete('/auth/kyc/document', {
                 data: { documentPath: docPath }
             });
 
             if (data.success) {
+                const updatedDocs = Array.isArray(data.data?.kycDocuments)
+                    ? data.data.kycDocuments
+                    : (user?.kycDocuments || []).filter(filterOut);
+
                 setUploadSuccess(t('docDeletedSuccess', 'KYC document removed successfully.'));
                 setConfirmDeleteDoc(null);
                 if (setUser) {
                     setUser(prev => ({
                         ...prev,
-                        kycDocuments: data.data?.kycDocuments !== undefined
-                            ? data.data.kycDocuments
-                            : (prev?.kycDocuments || []).filter(d => d !== docPath)
+                        kycDocuments: updatedDocs,
+                        verificationStatus: data.data?.verificationStatus || prev?.verificationStatus
                     }));
                 }
             }
@@ -243,6 +263,17 @@ export default function Dashboard() {
                                 {t('dashboard.downloadInvoice', 'Tax Invoice (PDF)')}
                             </>
                         )}
+                    </button>
+
+                    {/* Edit Profile Quick Action Button */}
+                    <button
+                        type="button"
+                        onClick={() => setIsEditProfileOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-gold-500/10 hover:bg-gold-500/20 text-gold-400 border border-gold-500/30 hover:border-gold-500/60 transition cursor-pointer shadow-sm shrink-0 whitespace-nowrap"
+                        title={language === 'ta' ? 'நுகர்வோர் சுயவிவரத்தைத் திருத்து' : 'Edit Consumer Profile'}
+                    >
+                        <UserCog size={13} className="text-gold-400" />
+                        <span>{language === 'ta' ? 'சுயவிவரம் திருத்து' : 'Edit Profile'}</span>
                     </button>
                 </div>
             </div>
@@ -762,6 +793,12 @@ export default function Dashboard() {
                     </div>
                 </div>
             )}
+
+            {/* Consumer Profile Edit & Update Modal */}
+            <EditProfileModal
+                isOpen={isEditProfileOpen}
+                onClose={() => setIsEditProfileOpen(false)}
+            />
         </div>
     );
 }

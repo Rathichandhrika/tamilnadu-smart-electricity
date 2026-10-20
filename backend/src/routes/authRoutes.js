@@ -8,6 +8,7 @@ const {
     getMe,
     uploadKycDocument,
     deleteKycDocument,
+    updateProfile,
     forgotPassword,
     resetPassword
 } = require('../controllers/authController');
@@ -21,6 +22,7 @@ router.post('/logout', logoutUser);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 router.get('/me', protect, getMe);
+router.put('/profile', protect, updateProfile);
 router.post('/kyc/upload', protect, upload.single('document'), uploadKycDocument);
 router.delete('/kyc/document', protect, deleteKycDocument);
 

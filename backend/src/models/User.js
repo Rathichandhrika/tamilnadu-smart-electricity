@@ -36,6 +36,17 @@ const userSchema = new mongoose.Schema({
         default: 'Chennai',
         trim: true
     },
+    phone: {
+        type: String,
+        default: '',
+        trim: true
+    },
+    address: {
+        street: { type: String, default: '' },
+        city: { type: String, default: 'Chennai' },
+        district: { type: String, default: 'Chennai' },
+        pincode: { type: String, default: '' }
+    },
     resetPasswordCode: {
         type: String,
         default: null

@@ -6,14 +6,16 @@ import api from '../services/api';
 import {
     LayoutDashboard, Calculator, Receipt, Activity, BrainCircuit,
     Sun, History, ShieldAlert, LogOut, Zap, X, Globe, UserCheck,
-    Building2, Factory, Home, ChevronRight, Bell, CreditCard
+    Building2, Factory, Home, ChevronRight, Bell, CreditCard, UserCog
 } from 'lucide-react';
+import EditProfileModal from './EditProfileModal';
 
 export default function Sidebar({ isOpen, close }) {
     const { user, logout } = useContext(AuthContext);
     const { language, toggleLanguage, t } = useLanguage();
     const location = useLocation();
     const [unreadCount, setUnreadCount] = useState(0);
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
     const isAdmin = user?.role === 'ADMIN';
     const searchParams = new URLSearchParams(location.search);
@@ -289,14 +291,21 @@ export default function Sidebar({ isOpen, close }) {
                 {/* 4. Consumer Profile & Connection Badge Footer */}
                 <div className="p-3.5 border-t border-panelBorder bg-darker/60 space-y-3">
                     {/* User Card */}
-                    <div className="bg-dark/80 border border-panelBorder/80 p-2.5 rounded-xl flex items-center gap-3 shadow-inner">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-panel to-darker border border-gold-500/30 flex items-center justify-center text-gold-400 font-bold text-sm shrink-0 shadow">
+                    <div 
+                        onClick={() => setIsProfileModalOpen(true)}
+                        className="bg-dark/80 border border-panelBorder/80 p-2.5 rounded-xl flex items-center gap-3 shadow-inner hover:border-gold-500/50 transition cursor-pointer group"
+                        title={language === 'ta' ? 'சுயவிவரத்தைத் திருத்த கிளிக் செய்க' : 'Click to edit consumer profile'}
+                    >
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-panel to-darker border border-gold-500/30 flex items-center justify-center text-gold-400 font-bold text-sm shrink-0 shadow group-hover:scale-105 transition">
                             {user?.name?.charAt(0).toUpperCase() || 'U'}
                         </div>
                         <div className="min-w-0 flex-1">
-                            <p className="text-xs font-bold text-white truncate leading-tight">
-                                {getUserDisplayName()}
-                            </p>
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs font-bold text-white truncate leading-tight group-hover:text-gold-400 transition">
+                                    {getUserDisplayName()}
+                                </p>
+                                <UserCog size={13} className="text-slate-500 group-hover:text-gold-400 transition shrink-0 ml-1" />
+                            </div>
 
                             {/* Service Number or Role */}
                             {user?.serviceNumber ? (
@@ -330,6 +339,12 @@ export default function Sidebar({ isOpen, close }) {
                     </button>
                 </div>
             </aside>
+
+            {/* Profile Edit Modal */}
+            <EditProfileModal
+                isOpen={isProfileModalOpen}
+                onClose={() => setIsProfileModalOpen(false)}
+            />
         </>
     );
 }
