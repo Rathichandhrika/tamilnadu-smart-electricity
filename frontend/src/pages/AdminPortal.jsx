@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import AdminAiAssistant from '../components/AdminAiAssistant';
+import KycDocumentViewer from '../components/KycDocumentViewer';
 
 const TN_DISTRICTS_MAP_TA = {
     'Ariyalur': 'அரியலூர்',
@@ -890,7 +891,7 @@ export default function AdminPortal() {
                                                                 </>
                                                             ) : null}
 
-                                                            {/* Quick Demo Scenario Adjuster */}
+                                                            {/* Quick Timeline Adjuster */}
                                                             {b.status !== 'PAID' && (
                                                                 <select
                                                                     defaultValue=""
@@ -901,13 +902,13 @@ export default function AdminPortal() {
                                                                         }
                                                                     }}
                                                                     className="px-2 py-1.5 rounded-lg bg-dark hover:bg-darker border border-gold-500/30 text-gold-400 text-xs font-semibold cursor-pointer outline-none shadow-sm"
-                                                                    title="Simulate due date & fine scenario for demo"
+                                                                    title={language === 'ta' ? 'கட்டணக் கால அவகாசம் மாற்றவும்' : 'Adjust billing timeline & status'}
                                                                 >
-                                                                    <option value="" disabled>⚡ Demo</option>
-                                                                    <option value="OVERDUE">⚠️ Overdue (-5d + ₹150 Fine)</option>
-                                                                    <option value="NEARING_DUE">⏰ Due Soon (+2d Left)</option>
-                                                                    <option value="PENDING_VERIFICATION">📝 Submit Verification Ref</option>
-                                                                    <option value="NORMAL">✅ Normal (15d Grace)</option>
+                                                                    <option value="" disabled>{language === 'ta' ? 'கால அவகாசம்' : '⚡ Timeline'}</option>
+                                                                    <option value="OVERDUE">⚠️ {language === 'ta' ? 'அபராதம் / தாமதம் (-5 நாட்கள்)' : 'Statutory Overdue (-5d + Fine)'}</option>
+                                                                    <option value="NEARING_DUE">⏰ {language === 'ta' ? 'கடைசி நாள் நினைவூட்டல் (+2 நாட்கள்)' : 'Due in 2 Days'}</option>
+                                                                    <option value="PENDING_VERIFICATION">📝 {language === 'ta' ? 'சரிபார்ப்பு நிலுவைக்கு மாற்று' : 'Pending Verification Queue'}</option>
+                                                                    <option value="NORMAL">✅ {language === 'ta' ? 'இயல்பு நிலை (15 நாட்கள்)' : 'Standard Cycle (15d)'}</option>
                                                                 </select>
                                                             )}
 
@@ -1617,59 +1618,13 @@ export default function AdminPortal() {
 
                                                     {/* Active Document Viewer */}
                                                     {activeDoc && (
-                                                        <div 
+                                                        <KycDocumentViewer
                                                             key={`${selectedConsumer._id}-${safeDocIndex}-${activeDoc}`}
-                                                            className="rounded-xl border border-panelBorder bg-darker overflow-hidden shadow-inner"
-                                                        >
-                                                            <div className="p-2.5 bg-dark border-b border-panelBorder flex justify-between items-center text-xs">
-                                                                <div className="flex items-center gap-2 truncate max-w-sm">
-                                                                    <span className="font-mono text-slate-300 truncate font-semibold">
-                                                                        {activeDoc.split('/').pop()}
-                                                                    </span>
-                                                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-panel border border-panelBorder text-gold-400">
-                                                                        {isPdf ? 'PDF Document' : 'Image Photo'}
-                                                                    </span>
-                                                                </div>
-                                                                <a
-                                                                    href={fullUrl}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="text-gold-400 hover:text-gold-300 font-bold flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gold-500/10 border border-gold-500/20 transition hover:bg-gold-500/20"
-                                                                >
-                                                                    <span>{language === 'ta' ? 'புதிய சாளரத்தில் திற' : 'Open in New Tab'}</span>
-                                                                    <ExternalLink size={12} />
-                                                                </a>
-                                                            </div>
-
-                                                            <div className="h-[420px] w-full bg-slate-950/80 flex items-center justify-center relative p-1">
-                                                                {isPdf ? (
-                                                                    <object
-                                                                        data={`${fullUrl}#toolbar=1&navpanes=0`}
-                                                                        type="application/pdf"
-                                                                        className="w-full h-full rounded-b-xl border-0"
-                                                                    >
-                                                                        <iframe
-                                                                            src={`${fullUrl}#toolbar=1`}
-                                                                            title="KYC Document Preview"
-                                                                            className="w-full h-full border-0 rounded-b-xl"
-                                                                        >
-                                                                            <p className="p-4 text-center text-xs text-slate-400">
-                                                                                Preview unavailable inside iframe.{' '}
-                                                                                <a href={fullUrl} target="_blank" rel="noreferrer" className="text-gold-400 underline">
-                                                                                    Click here to open PDF directly
-                                                                                </a>
-                                                                            </p>
-                                                                        </iframe>
-                                                                    </object>
-                                                                ) : (
-                                                                    <img
-                                                                        src={fullUrl}
-                                                                        alt="KYC Document"
-                                                                        className="max-h-full max-w-full object-contain rounded-lg p-2"
-                                                                    />
-                                                                )}
-                                                            </div>
-                                                        </div>
+                                                            docUrl={fullUrl}
+                                                            fileName={activeDoc.split('/').pop()}
+                                                            isPdf={isPdf}
+                                                            language={language}
+                                                        />
                                                     )}
                                                 </div>
                                             )}

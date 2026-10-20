@@ -30,9 +30,11 @@ ai-ml/venv/
 iot/venv/
 
 # Uploads & Temp Data
-uploads/
-backend/uploads/*
-!backend/uploads/.gitkeep
+/uploads/
+/backend/uploads/*
+!/backend/uploads/.gitkeep
+!/backend/uploads/kyc/
+!/backend/uploads/kyc/*
 database/data/
 mongodb_data/
 

@@ -682,7 +682,7 @@ export default function AuthPage() {
                                                 onClick={handleLoadDemoAdmin}
                                                 className="text-[11px] font-mono text-red-400 hover:text-red-300 underline cursor-pointer"
                                             >
-                                                {t('auth.fillDemoAdmin', 'Use Admin Demo')}
+                                                {t('auth.fillDemoAdmin', 'Fill Admin Credentials')}
                                             </button>
                                         </div>
                                     )}

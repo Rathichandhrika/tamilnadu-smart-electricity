@@ -662,15 +662,15 @@ export default function Calculator() {
                                 </div>
                             )}
 
-                            {/* Demo Mode / Due Date Timing Selector */}
+                            {/* Due Date & Billing Timing Selector */}
                             <div className="p-4 rounded-xl bg-darker border border-panelBorder space-y-3">
                                 <div className="flex items-center justify-between">
                                     <label className="text-xs font-bold uppercase tracking-wider text-gold-400 flex items-center gap-1.5">
                                         <Sparkles size={14} className="text-gold-400" />
-                                        <span>{language === 'ta' ? 'மாதிரி செய்முறை / காலக்கெடு (Demo Due Date Scenario)' : 'Demo Due Date & Payment Timing Scenario'}</span>
+                                        <span>{language === 'ta' ? 'கட்டணக் காலக்கெடு நிலை (Billing Cycle Scenario)' : 'Billing Due Date & Payment Timing Scenario'}</span>
                                     </label>
                                     <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gold-500/15 text-gold-400 border border-gold-500/30 font-bold">
-                                        DEMO TESTING
+                                        TIMELINE SIMULATION
                                     </span>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
