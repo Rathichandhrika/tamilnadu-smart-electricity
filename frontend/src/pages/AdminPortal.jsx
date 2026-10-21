@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo, Fragment } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useMemo, useContext, Fragment } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
 import api from '../services/api';
 import { 
     ShieldCheck, 
@@ -133,8 +134,20 @@ const getConsumerDocs = (c) => {
 };
 
 export default function AdminPortal() {
+    const { user, loading: authLoading } = useContext(AuthContext);
+    const navigate = useNavigate();
     const { t, language } = useLanguage();
     const [searchParams, setSearchParams] = useSearchParams();
+
+    // Strict Admin Protection: Non-admins (such as consumer Rathichandhrika) are immediately redirected to /dashboard
+    useEffect(() => {
+        if (!authLoading && user) {
+            const isOfficialAdmin = user.email?.toLowerCase().trim() === 'admin@smarttn.gov' && user.role === 'ADMIN';
+            if (!isOfficialAdmin) {
+                navigate('/dashboard', { replace: true });
+            }
+        }
+    }, [user, authLoading, navigate]);
     
     // Top Tabs: 'BILLING' | 'AI_ASSISTANT' | 'VERIFICATION' | 'GRID_ANALYTICS'
     const urlTab = searchParams.get('tab');

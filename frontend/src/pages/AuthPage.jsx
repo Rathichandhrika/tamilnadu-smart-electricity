@@ -56,7 +56,8 @@ export default function AuthPage() {
     // Auto-Redirect: If user is already authenticated, route them to their designated portal
     useEffect(() => {
         if (user) {
-            const targetPath = user.role === 'ADMIN' ? '/admin' : '/dashboard';
+            const isOfficialAdmin = user.email?.toLowerCase().trim() === 'admin@smarttn.gov' && user.role === 'ADMIN';
+            const targetPath = isOfficialAdmin ? '/admin' : '/dashboard';
             navigate(targetPath, { replace: true });
         }
     }, [user, navigate]);
