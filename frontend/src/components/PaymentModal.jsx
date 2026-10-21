@@ -47,7 +47,9 @@ export default function PaymentModal({ bill, isOpen, onClose, onPaymentSuccess }
             const billId = bill._id || bill.id;
             const res = await api.post(`/bills/${billId}/pay`, {
                 paymentMode: paymentMode,
-                transactionRef: `TNEB-QPAY-${Date.now().toString().slice(-8)}`
+                transactionRef: `TNEB-QPAY-${Date.now().toString().slice(-8)}`,
+                serviceNumber: serviceNumber,
+                consumerId: bill.consumer?._id || bill.consumer
             });
 
             if (res.data?.success) {

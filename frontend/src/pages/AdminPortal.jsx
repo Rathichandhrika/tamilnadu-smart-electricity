@@ -277,6 +277,24 @@ export default function AdminPortal() {
         fetchAdminPortalData();
         fetchBillsData();
         fetchAdminNotifications();
+
+        // Auto-refresh when tab gains focus
+        const onFocus = () => {
+            fetchBillsData();
+            fetchAdminNotifications();
+        };
+        window.addEventListener('focus', onFocus);
+
+        // Auto-refresh interval every 30 seconds
+        const pollTimer = setInterval(() => {
+            fetchBillsData();
+            fetchAdminNotifications();
+        }, 30000);
+
+        return () => {
+            window.removeEventListener('focus', onFocus);
+            clearInterval(pollTimer);
+        };
     }, []);
 
     // Reset document index whenever selected consumer changes
@@ -412,17 +430,25 @@ export default function AdminPortal() {
         setActionLoading(true);
         try {
             const billId = bill._id || bill.id;
-            const res = await api.post(`/admin/bills/${billId}/send-reminder`);
+            const res = await api.post(`/admin/bills/${billId}/send-reminder`, {
+                consumerId: bill.consumerId || bill.consumer?._id || (typeof bill.consumer === 'string' ? bill.consumer : undefined),
+                serviceNumber: bill.serviceNumber || bill.consumer?.serviceNumber,
+                userEmail: bill.userEmail || bill.consumer?.user?.email,
+                userName: bill.userName || bill.consumer?.user?.name,
+                billingMonth: bill.billingMonth
+            });
             if (res.data?.success) {
                 showToast(language === 'ta'
-                    ? `${bill.userName} அவர்களுக்கு கடைசி நாள் நினைவூட்டல் மின்னஞ்சல் & அறிவிப்பு அனுப்பப்பட்டது.`
-                    : `Due date reminder alert & email sent to ${bill.userName}.`);
+                    ? `${bill.userName || bill.consumer?.user?.name || 'நுகர்வோர்'} அவர்களுக்கு கடைசி நாள் நினைவூட்டல் மின்னஞ்சல் & அறிவிப்பு அனுப்பப்பட்டது.`
+                    : `Due date reminder alert & email sent to ${bill.userName || bill.consumer?.user?.name || 'Consumer'}.`);
                 fetchBillsData();
                 fetchAdminNotifications();
             }
         } catch (err) {
             console.error('Single reminder error:', err);
             showToast(err.response?.data?.message || 'Failed to dispatch due date reminder.');
+            fetchBillsData();
+            fetchAdminNotifications();
         } finally {
             setActionLoading(false);
         }
@@ -435,18 +461,24 @@ export default function AdminPortal() {
             const billId = bill._id || bill.id;
             const res = await api.put(`/admin/bills/${billId}/fine`, {
                 fineAmount: bill.fineAmount || 150,
-                reason: 'TANGEDCO Late Payment Surcharge (LPSC) for crossing statutory due date'
+                reason: 'TANGEDCO Late Payment Surcharge (LPSC) for crossing statutory due date',
+                consumerId: bill.consumerId || bill.consumer?._id || (typeof bill.consumer === 'string' ? bill.consumer : undefined),
+                serviceNumber: bill.serviceNumber || bill.consumer?.serviceNumber,
+                userEmail: bill.userEmail || bill.consumer?.user?.email,
+                userName: bill.userName || bill.consumer?.user?.name
             });
             if (res.data?.success) {
                 showToast(language === 'ta'
-                    ? `${bill.userName} அவர்களுக்கு தாமத அபராதம் விதிக்கப்பட்டு முறைப்படி அறிவிப்பு & மின்னஞ்சல் அனுப்பப்பட்டது.`
-                    : `Late surcharge imposed and notice emailed to ${bill.userName}.`);
+                    ? `${bill.userName || bill.consumer?.user?.name || 'நுகர்வோர்'} அவர்களுக்கு தாமத அபராதம் விதிக்கப்பட்டு முறைப்படி அறிவிப்பு & மின்னஞ்சல் அனுப்பப்பட்டது.`
+                    : `Late surcharge imposed and notice emailed to ${bill.userName || bill.consumer?.user?.name || 'Consumer'}.`);
                 fetchBillsData();
                 fetchAdminNotifications();
             }
         } catch (err) {
             console.error('Direct fine error:', err);
             showToast(err.response?.data?.message || 'Failed to impose overdue fine.');
+            fetchBillsData();
+            fetchAdminNotifications();
         } finally {
             setActionLoading(false);
         }
@@ -457,19 +489,27 @@ export default function AdminPortal() {
         if (!fineModalBill) return;
         setActionLoading(true);
         try {
-            const res = await api.put(`/admin/bills/${fineModalBill._id}/fine`, {
+            const billId = fineModalBill._id || fineModalBill.id;
+            const res = await api.put(`/admin/bills/${billId}/fine`, {
                 fineAmount: customFineAmount,
-                reason: customFineReason
+                reason: customFineReason,
+                consumerId: fineModalBill.consumerId || fineModalBill.consumer?._id || (typeof fineModalBill.consumer === 'string' ? fineModalBill.consumer : undefined),
+                serviceNumber: fineModalBill.serviceNumber || fineModalBill.consumer?.serviceNumber,
+                userEmail: fineModalBill.userEmail || fineModalBill.consumer?.user?.email,
+                userName: fineModalBill.userName || fineModalBill.consumer?.user?.name
             });
             if (res.data?.success) {
-                showToast(`Fine of ₹${customFineAmount} updated for ${fineModalBill.userName}. Alert sent.`);
+                showToast(`Fine of ₹${customFineAmount} updated for ${fineModalBill.userName || 'Consumer'}. Alert sent.`);
                 setFineModalBill(null);
                 setCustomFineReason('');
                 fetchBillsData();
+                fetchAdminNotifications();
             }
         } catch (err) {
             console.error('Fine apply error:', err);
             showToast(err.response?.data?.message || 'Failed to apply fine.');
+            fetchBillsData();
+            fetchAdminNotifications();
         } finally {
             setActionLoading(false);
         }
@@ -478,6 +518,7 @@ export default function AdminPortal() {
     // Admin Verify & Approve / Reject Payment Reference (Approach 1)
     const handleAdminVerifyPayment = async (bill, action = 'APPROVE') => {
         let rejectionReason = '';
+        const consumerName = bill.userName || bill.consumer?.user?.name || 'Consumer';
         if (action === 'REJECT') {
             rejectionReason = window.prompt(
                 language === 'ta'
@@ -487,15 +528,19 @@ export default function AdminPortal() {
             if (!rejectionReason) return;
         } else {
             const confirmMsg = language === 'ta' 
-                ? `${bill.userName}-ன் ${bill.billingMonth} மாத மின்கட்டணத்தை (ரசீது: ${bill.transactionRef || 'TNEB-QPAY'}, தொகை: ₹${bill.totalPayable?.toLocaleString()}) சரிபார்த்து உறுதிசெய்ய விரும்புகிறீர்களா?`
-                : `Are you sure you want to verify and APPROVE the payment of ₹${bill.totalPayable?.toLocaleString()} (Ref: ${bill.transactionRef || 'TNEB-QPAY'}) for ${bill.userName}?`;
+                ? `${consumerName}-ன் ${bill.billingMonth} மாத மின்கட்டணத்தை (ரசீது: ${bill.transactionRef || 'TNEB-QPAY'}, தொகை: ₹${bill.totalPayable?.toLocaleString()}) சரிபார்த்து உறுதிசெய்ய விரும்புகிறீர்களா?`
+                : `Are you sure you want to verify and APPROVE the payment of ₹${bill.totalPayable?.toLocaleString()} (Ref: ${bill.transactionRef || 'TNEB-QPAY'}) for ${consumerName}?`;
             if (!window.confirm(confirmMsg)) return;
         }
 
         try {
-            const res = await api.post(`/admin/bills/${bill._id}/verify-payment`, {
+            const billId = bill._id || bill.id;
+            const res = await api.post(`/admin/bills/${billId}/verify-payment`, {
                 action,
-                rejectionReason
+                rejectionReason,
+                consumerId: bill.consumerId || bill.consumer?._id || (typeof bill.consumer === 'string' ? bill.consumer : undefined),
+                serviceNumber: bill.serviceNumber || bill.consumer?.serviceNumber,
+                userEmail: bill.userEmail || bill.consumer?.user?.email
             });
             if (res.data?.success) {
                 showToast(
@@ -504,9 +549,12 @@ export default function AdminPortal() {
                         : (language === 'ta' ? 'கட்டண ரசீது எண் நிராகரிக்கப்பட்டது.' : 'Payment reference rejected.')
                 );
                 fetchBillsData();
+                fetchAdminNotifications();
             }
         } catch (err) {
             showToast(err.response?.data?.message || 'Failed to update payment verification.');
+            fetchBillsData();
+            fetchAdminNotifications();
         }
     };
 
@@ -518,10 +566,13 @@ export default function AdminPortal() {
             if (res.data?.success) {
                 showToast(res.data.message || `Bill adjusted to ${scenario}.`);
                 fetchBillsData();
+                fetchAdminNotifications();
             }
         } catch (err) {
             console.error('Date adjust error:', err);
             showToast(err.response?.data?.message || 'Failed to adjust bill date.');
+            fetchBillsData();
+            fetchAdminNotifications();
         } finally {
             setActionLoading(false);
         }

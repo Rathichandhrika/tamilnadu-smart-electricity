@@ -539,6 +539,138 @@ const sendDueDateReminders = async (req, res, next) => {
     }
 };
 
+// Resilient Helper: Resolves a Bill record by direct Bill ID, Service Number, Consumer ID, User ID, User Email, or related Alert
+const resolveBillRecord = async (id, reqBody = {}, reqQuery = {}, allowedStatuses = null) => {
+    let bill = null;
+    const isObjectId = id && typeof id === 'string' && id.match(/^[0-9a-fA-F]{24}$/);
+
+    // 1. Direct ID lookup on Bill
+    if (isObjectId) {
+        bill = await Bill.findById(id).populate({
+            path: 'consumer',
+            populate: { path: 'user' }
+        });
+        if (bill) return bill;
+    }
+
+    const statusQuery = allowedStatuses ? { status: { $in: allowedStatuses } } : {};
+
+    // 2. Lookup via serviceNumber (from body, query, or if param was not an ObjectId)
+    const serviceNumber = reqBody.serviceNumber || reqQuery.serviceNumber || (!isObjectId && id ? id : null);
+    if (serviceNumber) {
+        bill = await Bill.findOne({
+            serviceNumber: serviceNumber,
+            ...statusQuery
+        }).sort({ createdAt: -1 }).populate({
+            path: 'consumer',
+            populate: { path: 'user' }
+        });
+        if (bill) return bill;
+    }
+
+    // 3. Lookup via consumerId (from body, query, or if param was a consumerId)
+    const targetConsumerId = (reqBody.consumerId && reqBody.consumerId.match(/^[0-9a-fA-F]{24}$/)) 
+        ? reqBody.consumerId 
+        : ((reqBody.consumer && typeof reqBody.consumer === 'string' && reqBody.consumer.match(/^[0-9a-fA-F]{24}$/))
+            ? reqBody.consumer
+            : (isObjectId ? id : null));
+
+    if (targetConsumerId) {
+        bill = await Bill.findOne({
+            consumer: targetConsumerId,
+            ...statusQuery
+        }).sort({ createdAt: -1 }).populate({
+            path: 'consumer',
+            populate: { path: 'user' }
+        });
+        if (bill) return bill;
+    }
+
+    // 4. Lookup via user ID (if id or target is a user ObjectId)
+    if (isObjectId) {
+        const consumerByUser = await Consumer.findOne({ user: id });
+        if (consumerByUser) {
+            bill = await Bill.findOne({
+                consumer: consumerByUser._id,
+                ...statusQuery
+            }).sort({ createdAt: -1 }).populate({
+                path: 'consumer',
+                populate: { path: 'user' }
+            });
+            if (bill) return bill;
+        }
+    }
+
+    // 5. Lookup via userEmail
+    const userEmail = reqBody.userEmail || reqQuery.userEmail;
+    if (userEmail) {
+        const userObj = await User.findOne({ email: userEmail });
+        if (userObj) {
+            const consumerByEmail = await Consumer.findOne({ user: userObj._id });
+            if (consumerByEmail) {
+                bill = await Bill.findOne({
+                    consumer: consumerByEmail._id,
+                    ...statusQuery
+                }).sort({ createdAt: -1 }).populate({
+                    path: 'consumer',
+                    populate: { path: 'user' }
+                });
+                if (bill) return bill;
+            }
+        }
+    }
+
+    // 6. Lookup via Alert reference (if id was an alert ID or bill ID recorded in an alert)
+    if (isObjectId) {
+        const relatedAlert = await Alert.findOne({
+            $or: [{ _id: id }, { bill: id }]
+        });
+        if (relatedAlert) {
+            if (relatedAlert.consumer) {
+                bill = await Bill.findOne({
+                    consumer: relatedAlert.consumer,
+                    ...statusQuery
+                }).sort({ createdAt: -1 }).populate({
+                    path: 'consumer',
+                    populate: { path: 'user' }
+                });
+                if (bill) return bill;
+            }
+            if (relatedAlert.user) {
+                const consumerByAlertUser = await Consumer.findOne({ user: relatedAlert.user });
+                if (consumerByAlertUser) {
+                    bill = await Bill.findOne({
+                        consumer: consumerByAlertUser._id,
+                        ...statusQuery
+                    }).sort({ createdAt: -1 }).populate({
+                        path: 'consumer',
+                        populate: { path: 'user' }
+                    });
+                    if (bill) return bill;
+                }
+            }
+        }
+    }
+
+    // 7. Fallback: Any bill matching consumer/serviceNumber without status constraint
+    if (serviceNumber) {
+        bill = await Bill.findOne({ serviceNumber }).sort({ createdAt: -1 }).populate({
+            path: 'consumer',
+            populate: { path: 'user' }
+        });
+        if (bill) return bill;
+    }
+    if (targetConsumerId) {
+        bill = await Bill.findOne({ consumer: targetConsumerId }).sort({ createdAt: -1 }).populate({
+            path: 'consumer',
+            populate: { path: 'user' }
+        });
+        if (bill) return bill;
+    }
+
+    return null;
+};
+
 // @desc    Manually impose or adjust fine on a specific consumer bill
 // @route   PUT /api/admin/bills/:id/fine
 // @access  Private/Admin
@@ -547,13 +679,10 @@ const imposeManualFine = async (req, res, next) => {
         const { id } = req.params;
         const { fineAmount, reason } = req.body;
 
-        const bill = await Bill.findById(id).populate({
-            path: 'consumer',
-            populate: { path: 'user' }
-        });
+        const bill = await resolveBillRecord(id, req.body, req.query, ['UNPAID', 'OVERDUE']);
 
         if (!bill) {
-            return res.status(404).json({ success: false, message: 'Bill record not found.' });
+            return res.status(404).json({ success: false, message: 'Bill record not found. Please refresh the page to view current bill records.' });
         }
 
         const amount = Math.max(0, Number(fineAmount) || 0);
@@ -779,13 +908,10 @@ const verifyConsumerPayment = async (req, res, next) => {
         const { id } = req.params;
         const { action = 'APPROVE', rejectionReason = '' } = req.body;
 
-        const bill = await Bill.findById(id).populate({
-            path: 'consumer',
-            populate: { path: 'user' }
-        });
+        const bill = await resolveBillRecord(id, req.body, req.query, ['UNPAID', 'OVERDUE', 'PENDING_VERIFICATION', 'PAID']);
 
         if (!bill) {
-            return res.status(404).json({ success: false, message: 'Bill record not found.' });
+            return res.status(404).json({ success: false, message: 'Bill record not found. Please refresh the page to view current bill records.' });
         }
 
         const consumer = bill.consumer;
@@ -881,13 +1007,10 @@ const verifyConsumerPayment = async (req, res, next) => {
 const sendSingleBillReminder = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const bill = await Bill.findById(id).populate({
-            path: 'consumer',
-            populate: { path: 'user' }
-        });
+        const bill = await resolveBillRecord(id, req.body, req.query, ['UNPAID', 'OVERDUE']);
 
         if (!bill) {
-            return res.status(404).json({ success: false, message: 'Bill record not found.' });
+            return res.status(404).json({ success: false, message: 'Bill record not found. Please refresh the page to view current bill records.' });
         }
 
         const now = new Date();

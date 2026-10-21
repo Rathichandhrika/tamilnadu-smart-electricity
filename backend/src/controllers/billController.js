@@ -393,13 +393,47 @@ const payBill = async (req, res, next) => {
         const { id } = req.params;
         const { paymentMode = 'TANGEDCO_QUICKPAY', transactionRef, directConfirm = false } = req.body;
 
-        const bill = await Bill.findById(id).populate({
-            path: 'consumer',
-            populate: { path: 'user' }
-        });
+        let bill = null;
+        if (id && id.match(/^[0-9a-fA-F]{24}$/)) {
+            bill = await Bill.findById(id).populate({
+                path: 'consumer',
+                populate: { path: 'user' }
+            });
+        }
+
+        // Resilient Fallback: If bill ID was from previous session or consumer submits by serviceNumber / consumerId
+        if (!bill) {
+            const serviceNumber = req.body.serviceNumber || (!id?.match(/^[0-9a-fA-F]{24}$/) ? id : null);
+            const consumerId = req.body.consumerId || (id?.match(/^[0-9a-fA-F]{24}$/) ? id : null);
+
+            if (serviceNumber) {
+                bill = await Bill.findOne({ serviceNumber, status: { $ne: 'PAID' } }).sort({ createdAt: -1 }).populate({
+                    path: 'consumer',
+                    populate: { path: 'user' }
+                });
+            }
+
+            if (!bill && consumerId) {
+                bill = await Bill.findOne({ consumer: consumerId, status: { $ne: 'PAID' } }).sort({ createdAt: -1 }).populate({
+                    path: 'consumer',
+                    populate: { path: 'user' }
+                });
+            }
+
+            // Fallback: look up consumer profile of current authenticated user
+            if (!bill && req.user) {
+                const consumerObj = await Consumer.findOne({ user: req.user._id });
+                if (consumerObj) {
+                    bill = await Bill.findOne({ consumer: consumerObj._id, status: { $ne: 'PAID' } }).sort({ createdAt: -1 }).populate({
+                        path: 'consumer',
+                        populate: { path: 'user' }
+                    });
+                }
+            }
+        }
 
         if (!bill) {
-            return res.status(404).json({ success: false, message: 'Bill record not found' });
+            return res.status(404).json({ success: false, message: 'Bill record not found. Please refresh to view current bills.' });
         }
 
         const isOwner = bill.consumer?.user?._id?.toString() === req.user._id.toString();
@@ -534,13 +568,37 @@ const adjustBillDueDate = async (req, res, next) => {
         const { id } = req.params;
         const { scenario, daysOffset, customFine } = req.body;
 
-        const bill = await Bill.findById(id).populate({
-            path: 'consumer',
-            populate: { path: 'user' }
-        });
+        let bill = null;
+        if (id && id.match(/^[0-9a-fA-F]{24}$/)) {
+            bill = await Bill.findById(id).populate({
+                path: 'consumer',
+                populate: { path: 'user' }
+            });
+        }
 
         if (!bill) {
-            return res.status(404).json({ success: false, message: 'Bill record not found' });
+            const serviceNumber = req.body.serviceNumber;
+            if (serviceNumber) {
+                bill = await Bill.findOne({ serviceNumber }).sort({ createdAt: -1 }).populate({
+                    path: 'consumer',
+                    populate: { path: 'user' }
+                });
+            }
+            if (!bill && id) {
+                bill = await Bill.findOne({
+                    $or: [
+                        { consumer: id.match(/^[0-9a-fA-F]{24}$/) ? id : null },
+                        { serviceNumber: id }
+                    ]
+                }).sort({ createdAt: -1 }).populate({
+                    path: 'consumer',
+                    populate: { path: 'user' }
+                });
+            }
+        }
+
+        if (!bill) {
+            return res.status(404).json({ success: false, message: 'Bill record not found. Please refresh to view current bills.' });
         }
 
         const consumer = bill.consumer;

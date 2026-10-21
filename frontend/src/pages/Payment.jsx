@@ -129,9 +129,12 @@ export default function Payment() {
         setConfirmationSuccess('');
 
         try {
-            const { data } = await api.post(`/bills/${selectedBillForConfirmation._id}/pay`, {
+            const billId = selectedBillForConfirmation._id || selectedBillForConfirmation.id;
+            const { data } = await api.post(`/bills/${billId}/pay`, {
                 paymentMode: 'TANGEDCO_QUICKPAY',
-                transactionRef: tnebTxnRef.trim() || `TNEB-${Date.now().toString().slice(-8)}`
+                transactionRef: tnebTxnRef.trim() || `TNEB-${Date.now().toString().slice(-8)}`,
+                serviceNumber: selectedBillForConfirmation.serviceNumber || selectedBillForConfirmation.consumer?.serviceNumber,
+                consumerId: selectedBillForConfirmation.consumer?._id || selectedBillForConfirmation.consumer
             });
 
             if (data.success) {
@@ -152,6 +155,7 @@ export default function Payment() {
                 err.response?.data?.message ||
                 (language === 'ta' ? 'கட்டணத்தை உறுதிப்படுத்துவதில் பிழை ஏற்பட்டது.' : 'Failed to submit payment confirmation.')
             );
+            fetchBills();
         } finally {
             setConfirmingPayment(false);
         }
