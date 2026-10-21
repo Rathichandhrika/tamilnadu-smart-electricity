@@ -342,7 +342,7 @@ export default function Notifications() {
                                                         </p>
                                                     </div>
 
-                                                    {alert.bill.status !== 'PAID' && (
+                                                    {alert.bill.status !== 'PAID' ? (
                                                         <button
                                                             type="button"
                                                             onClick={() => {
@@ -354,6 +354,16 @@ export default function Notifications() {
                                                             <CreditCard size={14} />
                                                             <span>{language === 'ta' ? 'உடனே கட்டணம் செலுத்து' : 'Pay Bill Now'}</span>
                                                             <ExternalLink size={12} />
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => navigate('/payment')}
+                                                            className="px-4 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md"
+                                                        >
+                                                            <FileText size={14} />
+                                                            <span>{language === 'ta' ? 'ரசீதைப் பார்க்க' : 'View Tax Invoice & Receipt'}</span>
+                                                            <ChevronRight size={14} />
                                                         </button>
                                                     )}
                                                 </div>

@@ -912,7 +912,7 @@ const sendSingleBillReminder = async (req, res, next) => {
                 dueDate: dueDateFormatted,
                 daysLeft: daysLeft,
                 billingMonth: bill.billingMonth,
-                district: dist
+                district: consumer?.district || user?.district || 'Tamil Nadu'
             }).catch(e => console.warn('Single due reminder email error:', e.message));
         }
 
