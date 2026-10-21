@@ -3,7 +3,7 @@ const Consumer = require('../models/Consumer');
 const IoTReading = require('../models/IoTReading');
 const Bill = require('../models/Bill');
 const Alert = require('../models/Alert');
-const { sendDueDateReminderEmail, sendOverdueFineNoticeEmail } = require('../services/emailService');
+const { sendDueDateReminderEmail, sendOverdueFineNoticeEmail, sendPaymentInvoiceReceiptEmail } = require('../services/emailService');
 
 // @desc    Get system-wide statistics for Admin Dashboard & Verification Portal
 // @route   GET /api/admin/stats
@@ -819,9 +819,28 @@ const verifyConsumerPayment = async (req, res, next) => {
                 bill: bill._id
             });
 
+            // Dispatch Official Tax Invoice & Payment Receipt Email to Consumer
+            if (user?.email) {
+                sendPaymentInvoiceReceiptEmail({
+                    toEmail: user.email,
+                    consumerName: user.name,
+                    serviceNumber: consumer?.serviceNumber || bill.serviceNumber || 'N/A',
+                    district: consumer?.district || user?.district || 'Tamil Nadu',
+                    billingMonth: bill.billingMonth,
+                    totalAmount: bill.totalAmount,
+                    fineAmount: bill.fineAmount || 0,
+                    totalPaid: totalPayable,
+                    transactionRef: bill.transactionRef || 'TNEB-QPAY',
+                    paymentMode: bill.paymentMode || 'TANGEDCO Quick Pay',
+                    paidDate: bill.paidAt || new Date(),
+                    connectionType: bill.connectionType,
+                    unitsConsumed: bill.unitsConsumed
+                }).catch(e => console.warn('Payment invoice receipt email error:', e.message));
+            }
+
             return res.status(200).json({
                 success: true,
-                message: `Payment approved and verified for ${user?.name || 'Consumer'}. Official tax invoice & receipt issued.`,
+                message: `Payment approved and verified for ${user?.name || 'Consumer'}. Official tax invoice & receipt issued and emailed.`,
                 data: bill
             });
         } else {

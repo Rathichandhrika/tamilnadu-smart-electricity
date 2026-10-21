@@ -4,6 +4,7 @@ const Consumer = require('../models/Consumer');
 const Bill = require('../models/Bill');
 const Alert = require('../models/Alert');
 const { generateBill } = require('../services/billing/billCalculator');
+const { sendPaymentInvoiceReceiptEmail } = require('../services/emailService');
 
 /**
  * Calculates Commercial (LT-V_COMMERCIAL) Non-Telescopic Bill
@@ -453,6 +454,25 @@ const payBill = async (req, res, next) => {
                 user: user?._id,
                 bill: bill._id
             });
+
+            // Dispatch Official Tax Invoice & Payment Receipt Email to Consumer
+            if (user?.email) {
+                sendPaymentInvoiceReceiptEmail({
+                    toEmail: user.email,
+                    consumerName: user.name,
+                    serviceNumber: consumer?.serviceNumber || bill.serviceNumber || 'N/A',
+                    district: consumer?.district || user?.district || 'Tamil Nadu',
+                    billingMonth: bill.billingMonth,
+                    totalAmount: bill.totalAmount,
+                    fineAmount: bill.fineAmount || 0,
+                    totalPaid: totalPayable,
+                    transactionRef: genRef,
+                    paymentMode: paymentMode,
+                    paidDate: bill.paidAt || new Date(),
+                    connectionType: bill.connectionType,
+                    unitsConsumed: bill.unitsConsumed
+                }).catch(e => console.warn('Payment receipt email dispatch error:', e.message));
+            }
         } else {
             // Consumer Alert
             await Alert.create({

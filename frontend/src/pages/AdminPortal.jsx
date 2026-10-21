@@ -500,7 +500,7 @@ export default function AdminPortal() {
             if (res.data?.success) {
                 showToast(
                     action === 'APPROVE'
-                        ? (language === 'ta' ? 'மின்கட்டணம் வெற்றிகரமாக உறுதிசெய்யப்பட்டு ரசீது வழங்கப்பட்டது.' : 'Payment approved and verified successfully.')
+                        ? (language === 'ta' ? 'மின்கட்டணம் உறுதிசெய்யப்பட்டு அதிகாரப்பூர்வ ரசீது நுகர்வோர் மின்னஞ்சலுக்கு அனுப்பப்பட்டது.' : 'Payment verified! Official tax invoice & receipt emailed to consumer.')
                         : (language === 'ta' ? 'கட்டண ரசீது எண் நிராகரிக்கப்பட்டது.' : 'Payment reference rejected.')
                 );
                 fetchBillsData();

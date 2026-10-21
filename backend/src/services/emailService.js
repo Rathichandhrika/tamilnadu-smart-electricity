@@ -38,36 +38,20 @@ const getTransporterCandidates = (user, pass, host, port) => {
     const isGmail = host.includes('gmail') || user.endsWith('@gmail.com');
 
     if (isGmail) {
-        // Candidate 1: Direct SMTP SSL on port 465 (Most reliable for Gmail app passwords)
-        candidates.push({
-            name: 'Direct Gmail SMTP (SSL:465)',
-            transporter: nodemailer.createTransport({
-                host: 'smtp.gmail.com',
-                port: 465,
-                secure: true,
-                family: 4, // Force IPv4 to prevent ENETUNREACH
-                auth: { user, pass },
-                connectionTimeout: 15000,
-                greetingTimeout: 15000,
-                socketTimeout: 20000,
-                tls: { rejectUnauthorized: false }
-            })
-        });
-
-        // Candidate 2: Standard Gmail service
+        // Candidate 1: Standard Gmail service (Most reliable and fast for Gmail App Passwords)
         candidates.push({
             name: 'Gmail Service',
             transporter: nodemailer.createTransport({
                 service: 'gmail',
                 family: 4, // Force IPv4
                 auth: { user, pass },
-                connectionTimeout: 15000,
-                greetingTimeout: 15000,
-                socketTimeout: 20000
+                connectionTimeout: 8000,
+                greetingTimeout: 8000,
+                socketTimeout: 10000
             })
         });
 
-        // Candidate 3: Direct SMTP STARTTLS on port 587
+        // Candidate 2: Direct SMTP STARTTLS on port 587
         candidates.push({
             name: 'Direct Gmail SMTP (STARTTLS:587)',
             transporter: nodemailer.createTransport({
@@ -77,9 +61,25 @@ const getTransporterCandidates = (user, pass, host, port) => {
                 requireTLS: true,
                 family: 4, // Force IPv4
                 auth: { user, pass },
-                connectionTimeout: 15000,
-                greetingTimeout: 15000,
-                socketTimeout: 20000,
+                connectionTimeout: 8000,
+                greetingTimeout: 8000,
+                socketTimeout: 10000,
+                tls: { rejectUnauthorized: false }
+            })
+        });
+
+        // Candidate 3: Direct SMTP SSL on port 465
+        candidates.push({
+            name: 'Direct Gmail SMTP (SSL:465)',
+            transporter: nodemailer.createTransport({
+                host: 'smtp.gmail.com',
+                port: 465,
+                secure: true,
+                family: 4, // Force IPv4
+                auth: { user, pass },
+                connectionTimeout: 8000,
+                greetingTimeout: 8000,
+                socketTimeout: 10000,
                 tls: { rejectUnauthorized: false }
             })
         });
@@ -549,9 +549,155 @@ TANGEDCO Central Management System
     return dispatchEmail({ toEmail: adminEmail, subject, plainTextContent, htmlContent });
 };
 
+/**
+ * Send Official TANGEDCO Payment Tax Invoice & Receipt Email to Consumer
+ */
+const sendPaymentInvoiceReceiptEmail = async ({
+    toEmail,
+    consumerName = 'Consumer',
+    serviceNumber = 'N/A',
+    district = 'Tamil Nadu',
+    billingMonth = 'Billing Cycle',
+    totalAmount = 0,
+    fineAmount = 0,
+    totalPaid = 0,
+    transactionRef = 'TNEB-QPAY',
+    paymentMode = 'TANGEDCO Quick Pay',
+    paidDate = new Date(),
+    connectionType = 'LT-1A_DOMESTIC',
+    unitsConsumed = 0
+}) => {
+    const portalUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/payment`;
+    const formattedPaidDate = new Date(paidDate).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    const finalAmountPaid = totalPaid || (totalAmount + (fineAmount || 0));
+    const subject = `🧾 TANGEDCO Official Tax Invoice & Payment Receipt: ₹${finalAmountPaid.toLocaleString()} (${billingMonth} - Service: ${serviceNumber})`;
+
+    const plainTextContent = `TANGEDCO - TAMIL NADU ELECTRICITY BOARD
+OFFICIAL TAX INVOICE & PAYMENT RECEIPT
+அதிகாரப்பூர்வ மின்கட்டண ரசீது
+
+Dear ${consumerName},
+
+Your electricity bill payment has been successfully verified on the TANGEDCO central ledger. Your official tax invoice and payment receipt have been generated.
+
+RECEIPT DETAILS:
+- Receipt / Transaction Ref: ${transactionRef}
+- Service Number: ${serviceNumber}
+- District Circle: ${district}
+- Tariff Category: ${connectionType}
+- Billing Cycle: ${billingMonth}
+- Units Consumed: ${unitsConsumed} kWh
+- Base Energy Charges: ₹${totalAmount.toLocaleString()}
+- Late Surcharge / Fine: ₹${(fineAmount || 0).toLocaleString()}
+- Total Amount Paid: ₹${finalAmountPaid.toLocaleString()}
+- Payment Method: ${paymentMode.replace(/_/g, ' ')}
+- Payment Timestamp: ${formattedPaidDate}
+- Verification Status: APPROVED & VERIFIED (சரிபார்க்கப்பட்டது)
+
+View and download your digital receipt anytime on the Consumer Portal:
+${portalUrl}
+
+Thank you for paying your TANGEDCO electricity bill.
+
+Warm regards,
+TANGEDCO Central Revenue & Accounts Department
+Government of Tamil Nadu
+`;
+
+    const htmlContent = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #0f172a; color: #f8fafc; border-radius: 16px; overflow: hidden; border: 2px solid #10b981;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #064e3b 0%, #0f172a 100%); padding: 26px 24px; text-align: center; border-bottom: 2px solid #10b981;">
+            <div style="display: inline-block; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.5); border-radius: 12px; padding: 8px 16px; margin-bottom: 10px;">
+                <span style="font-size: 20px; color: #34d399; font-weight: 900; letter-spacing: 1px;">⚡ TANGEDCO OFFICIAL RECEIPT</span>
+            </div>
+            <h1 style="color: #ffffff; font-size: 17px; margin: 0; font-weight: 700;">தமிழ்நாடு மின் உற்பத்தி மற்றும் பகிர்மானக் கழகம்</h1>
+            <p style="color: #34d399; font-size: 12px; font-weight: 700; margin: 4px 0 0 0;">அதிகாரப்பூர்வ மின்கட்டண வரி ரசீது (Tax Invoice & Payment Receipt)</p>
+        </div>
+
+        <!-- Success Banner -->
+        <div style="padding: 28px 24px;">
+            <div style="background: rgba(16, 185, 129, 0.12); border-left: 4px solid #10b981; padding: 14px 16px; border-radius: 8px; margin-bottom: 20px;">
+                <p style="color: #34d399; font-weight: 800; margin: 0; font-size: 14px;">
+                    ✅ PAYMENT RECEIVED & VERIFIED
+                </p>
+                <p style="color: #cbd5e1; font-size: 12px; margin: 6px 0 0 0; line-height: 1.5;">
+                    Hello <strong>${consumerName}</strong>, your electricity payment of <strong>₹${finalAmountPaid.toLocaleString()}</strong> for <strong>${billingMonth}</strong> has been officially confirmed on the TANGEDCO revenue ledger.
+                </p>
+            </div>
+
+            <!-- Receipt Info Card -->
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; background: #1e293b; border-radius: 10px; overflow: hidden; font-size: 13px;">
+                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+                    <td style="padding: 10px 16px; color: #94a3b8;">Receipt / Tx Reference:</td>
+                    <td style="padding: 10px 16px; color: #f59e0b; font-weight: 800; font-family: monospace;">${transactionRef}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+                    <td style="padding: 10px 16px; color: #94a3b8;">Service Number:</td>
+                    <td style="padding: 10px 16px; color: #ffffff; font-weight: 700; font-family: monospace;">${serviceNumber}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+                    <td style="padding: 10px 16px; color: #94a3b8;">District Circle:</td>
+                    <td style="padding: 10px 16px; color: #ffffff; font-weight: 600;">${district}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+                    <td style="padding: 10px 16px; color: #94a3b8;">Billing Month:</td>
+                    <td style="padding: 10px 16px; color: #ffffff;">${billingMonth}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+                    <td style="padding: 10px 16px; color: #94a3b8;">Consumption:</td>
+                    <td style="padding: 10px 16px; color: #ffffff; font-weight: 600;">${unitsConsumed} kWh (Units)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+                    <td style="padding: 10px 16px; color: #94a3b8;">Base Energy Bill:</td>
+                    <td style="padding: 10px 16px; color: #ffffff;">₹${totalAmount.toLocaleString()}</td>
+                </tr>
+                ${fineAmount > 0 ? `
+                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+                    <td style="padding: 10px 16px; color: #f87171;">Late Fee Surcharge:</td>
+                    <td style="padding: 10px 16px; color: #f87171; font-weight: 700;">+₹${fineAmount.toLocaleString()}</td>
+                </tr>` : ''}
+                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+                    <td style="padding: 10px 16px; color: #94a3b8;">Payment Timestamp:</td>
+                    <td style="padding: 10px 16px; color: #94a3b8; font-size: 12px;">${formattedPaidDate}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 14px 16px; color: #94a3b8; font-size: 14px;">Total Paid:</td>
+                    <td style="padding: 14px 16px; color: #34d399; font-size: 22px; font-weight: 900; font-family: monospace;">₹${finalAmountPaid.toLocaleString()}</td>
+                </tr>
+            </table>
+
+            <!-- CTA Button -->
+            <div style="text-align: center; margin-bottom: 18px;">
+                <a href="${portalUrl}" style="display: inline-block; background: #10b981; color: #042f2e; font-weight: 800; font-size: 14px; padding: 13px 32px; border-radius: 12px; text-decoration: none; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);">
+                    View & Download Invoice in Consumer Portal →
+                </a>
+            </div>
+
+            <p style="color: #64748b; font-size: 11px; text-align: center; margin: 0;">
+                This document is a digitally generated tax invoice from TANGEDCO. Keep this receipt for your personal accounting and tax records.
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div style="background: #090d16; padding: 16px 24px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+            <p style="color: #64748b; font-size: 11px; margin: 0;">© 2026 TANGEDCO | Government of Tamil Nadu. All rights reserved.</p>
+        </div>
+    </div>`;
+
+    return dispatchEmail({ toEmail, subject, plainTextContent, htmlContent });
+};
+
 module.exports = {
     sendPasswordResetEmail,
     sendDueDateReminderEmail,
     sendOverdueFineNoticeEmail,
+    sendPaymentInvoiceReceiptEmail,
     sendAdminKycNotificationEmail
 };
