@@ -480,12 +480,13 @@ export default function Payment() {
                                                         Ref: {bill.transactionRef}
                                                     </span>
                                                     <a
-                                                        href="https://www.tnebnet.org/awp/login"
+                                                        href="https://www.tnebnet.org/qpay/"
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         className="py-2 px-3 bg-dark hover:bg-darker border border-panelBorder text-slate-300 text-xs font-bold rounded-xl flex items-center gap-1.5"
+                                                        title="Direct TNEB Quick Pay"
                                                     >
-                                                        <span>{language === 'ta' ? 'TANGEDCO தளம்' : 'TANGEDCO Portal'}</span>
+                                                        <span>{language === 'ta' ? 'TNEB உடனடி கட்டணம்' : 'TNEB Quick Pay'}</span>
                                                         <ExternalLink size={12} />
                                                     </a>
                                                 </div>

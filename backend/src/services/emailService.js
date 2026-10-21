@@ -2,6 +2,12 @@ const nodemailer = require('nodemailer');
 const axios = require('axios');
 const path = require('path');
 const dotenv = require('dotenv');
+const dns = require('dns');
+
+// Force IPv4 DNS resolution first to avoid connect ENETUNREACH on IPv6
+if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder('ipv4first');
+}
 
 // Ensure environment variables are loaded regardless of how this module is invoked
 dotenv.config({ path: path.join(__dirname, '../../../.env') });
@@ -9,40 +15,55 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 dotenv.config();
 
 /**
+ * Filter non-deliverable / simulated domains to prevent Google Mailer-Daemon bounces
+ */
+const isDeliverableDomain = (email) => {
+    if (!email || typeof email !== 'string') return false;
+    const normalized = email.toLowerCase().trim();
+    const domain = normalized.split('@')[1];
+    if (!domain) return false;
+    const nonDeliverable = ['smarttn.gov', 'example.com', 'test.com', 'localhost', 'invalid', 'dummy.com'];
+    if (nonDeliverable.includes(domain)) return false;
+    return true;
+};
+
+/**
  * Build array of transporter configs to attempt sequentially.
- * Primary: Gmail service
- * Fallback 1: Direct SSL on port 465
- * Fallback 2: Direct STARTTLS on port 587
+ * Primary: Gmail service with IPv4
+ * Fallback 1: Direct SSL on port 465 with IPv4
+ * Fallback 2: Direct STARTTLS on port 587 with IPv4
  */
 const getTransporterCandidates = (user, pass, host, port) => {
     const candidates = [];
     const isGmail = host.includes('gmail') || user.endsWith('@gmail.com');
 
     if (isGmail) {
-        // Candidate 1: Standard Gmail service
-        candidates.push({
-            name: 'Gmail Service',
-            transporter: nodemailer.createTransport({
-                service: 'gmail',
-                auth: { user, pass },
-                connectionTimeout: 20000,
-                greetingTimeout: 20000,
-                socketTimeout: 30000
-            })
-        });
-
-        // Candidate 2: Direct SMTP SSL on port 465
+        // Candidate 1: Direct SMTP SSL on port 465 (Most reliable for Gmail app passwords)
         candidates.push({
             name: 'Direct Gmail SMTP (SSL:465)',
             transporter: nodemailer.createTransport({
                 host: 'smtp.gmail.com',
                 port: 465,
                 secure: true,
+                family: 4, // Force IPv4 to prevent ENETUNREACH
                 auth: { user, pass },
-                connectionTimeout: 20000,
-                greetingTimeout: 20000,
-                socketTimeout: 30000,
+                connectionTimeout: 15000,
+                greetingTimeout: 15000,
+                socketTimeout: 20000,
                 tls: { rejectUnauthorized: false }
+            })
+        });
+
+        // Candidate 2: Standard Gmail service
+        candidates.push({
+            name: 'Gmail Service',
+            transporter: nodemailer.createTransport({
+                service: 'gmail',
+                family: 4, // Force IPv4
+                auth: { user, pass },
+                connectionTimeout: 15000,
+                greetingTimeout: 15000,
+                socketTimeout: 20000
             })
         });
 
@@ -54,10 +75,11 @@ const getTransporterCandidates = (user, pass, host, port) => {
                 port: 587,
                 secure: false,
                 requireTLS: true,
+                family: 4, // Force IPv4
                 auth: { user, pass },
-                connectionTimeout: 20000,
-                greetingTimeout: 20000,
-                socketTimeout: 30000,
+                connectionTimeout: 15000,
+                greetingTimeout: 15000,
+                socketTimeout: 20000,
                 tls: { rejectUnauthorized: false }
             })
         });
@@ -68,10 +90,11 @@ const getTransporterCandidates = (user, pass, host, port) => {
                 host: host,
                 port: port,
                 secure: port === 465,
+                family: 4,
                 auth: { user, pass },
-                connectionTimeout: 20000,
-                greetingTimeout: 20000,
-                socketTimeout: 30000,
+                connectionTimeout: 15000,
+                greetingTimeout: 15000,
+                socketTimeout: 20000,
                 tls: { rejectUnauthorized: false }
             })
         });
@@ -92,6 +115,18 @@ const dispatchEmail = async ({ toEmail, subject, plainTextContent, htmlContent }
     const hasSmtpConfigured = Boolean(user && pass);
 
     console.log(`[EMAIL DISPATCH] Target: ${toEmail} | Subject: "${subject}"`);
+
+    // Prevent Mailer-Daemon bounce by skipping external SMTP for mock / internal demo domains
+    if (!isDeliverableDomain(toEmail)) {
+        console.log(`[EMAIL SIMULATED] Skipping external SMTP dispatch for mock/internal domain: ${toEmail}. In-app alert created.`);
+        return {
+            success: true,
+            sentOverSmtp: false,
+            simulated: true,
+            messageId: `simulated-${Date.now()}`,
+            method: 'Internal Simulation'
+        };
+    }
 
     // 1. Try Resend HTTPS API if key is present
     if (process.env.RESEND_API_KEY) {
@@ -232,7 +267,7 @@ const sendDueDateReminderEmail = async ({
     billingMonth = 'Current Cycle',
     district = 'Tamil Nadu'
 }) => {
-    const payUrl = `${process.env.FRONTEND_URL || 'https://tamilnadu-smart-electricity.vercel.app'}/payment`;
+    const payUrl = 'https://www.tnebnet.org/qpay/';
     const subject = `⏰ TANGEDCO Due Reminder: ₹${amount.toLocaleString()} due in ${daysLeft} days (Service: ${serviceNumber})`;
 
     const plainTextContent = `TANGEDCO - TAMIL NADU ELECTRICITY BOARD
@@ -342,7 +377,7 @@ const sendOverdueFineNoticeEmail = async ({
     district = 'Tamil Nadu',
     fineReason = 'TANGEDCO Late Payment Surcharge (LPSC)'
 }) => {
-    const payUrl = `${process.env.FRONTEND_URL || 'https://tamilnadu-smart-electricity.vercel.app'}/payment`;
+    const payUrl = 'https://www.tnebnet.org/qpay/';
     const subject = `⚠️ URGENT: TANGEDCO Overdue Notice & Fine Imposed (Service: ${serviceNumber}) - Total Due: ₹${totalPayable.toLocaleString()}`;
 
     const plainTextContent = `TANGEDCO - TAMIL NADU ELECTRICITY BOARD

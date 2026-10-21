@@ -163,12 +163,13 @@ export default function PaymentModal({ bill, isOpen, onClose, onPaymentSuccess }
                                     </button>
 
                                     <a
-                                        href="https://www.tnebnet.org/awp/login"
+                                        href="https://www.tnebnet.org/qpay/"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg bg-gold-500/20 hover:bg-gold-500/30 border border-gold-500/40 text-xs font-bold text-gold-300 flex items-center justify-center gap-1.5 transition"
+                                        title="Direct TNEB Quick Pay"
                                     >
-                                        <span>{language === 'ta' ? 'TNPDCL தளம்' : 'TNPDCL Portal'}</span>
+                                        <span>{language === 'ta' ? 'TNEB உடனடி தளம்' : 'TNEB Quick Pay'}</span>
                                         <ExternalLink size={13} />
                                     </a>
                                 </div>

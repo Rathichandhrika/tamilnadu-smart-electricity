@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { 
@@ -29,6 +29,8 @@ import {
     RefreshCw,
     ShieldAlert,
     ChevronRight,
+    ChevronDown,
+    CornerDownRight,
     Activity,
     Gauge,
     Sun,
@@ -173,6 +175,14 @@ export default function AdminPortal() {
     const [billSearch, setBillSearch] = useState('');
     const [scanningFines, setScanningFines] = useState(false);
     const [sendingReminders, setSendingReminders] = useState(false);
+    const [expandedConsumerHistory, setExpandedConsumerHistory] = useState({});
+
+    const toggleConsumerHistory = (consumerKey) => {
+        setExpandedConsumerHistory(prev => ({
+            ...prev,
+            [consumerKey]: !prev[consumerKey]
+        }));
+    };
 
     // Fine Adjustment Modal
     const [fineModalBill, setFineModalBill] = useState(null);
@@ -536,6 +546,35 @@ export default function AdminPortal() {
         return matchesStatus && matchesDistrict && matchesSearch;
     });
 
+    // Group filtered bills by unique consumer so each username appears once with their most recent history
+    const groupedConsumerBills = useMemo(() => {
+        const map = new Map();
+        for (const bill of filteredBills) {
+            const consumerKey = bill.serviceNumber || (bill.consumerId?._id || bill.consumerId) || bill.userEmail || bill.userName || bill._id;
+            if (!map.has(consumerKey)) {
+                map.set(consumerKey, []);
+            }
+            map.get(consumerKey).push(bill);
+        }
+
+        const groups = [];
+        for (const [key, bList] of map.entries()) {
+            // Sort descending by generation / due date so index 0 is always the most recent bill
+            const sorted = [...bList].sort((a, b) => {
+                const timeA = new Date(a.createdAt || a.dueDate || 0).getTime();
+                const timeB = new Date(b.createdAt || b.dueDate || 0).getTime();
+                return timeB - timeA;
+            });
+            groups.push({
+                key,
+                recentBill: sorted[0],
+                previousBills: sorted.slice(1),
+                allBills: sorted
+            });
+        }
+        return groups;
+    }, [filteredBills]);
+
     // Unique districts from bills
     const districtsList = Array.from(new Set(bills.map(b => b.district).filter(Boolean)));
 
@@ -616,12 +655,13 @@ export default function AdminPortal() {
                     </button>
 
                     <a
-                        href="https://www.tnebnet.org/awp/login"
+                        href="https://www.tnebnet.org/qpay/"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-3.5 py-1.5 rounded-xl bg-gold-500/15 hover:bg-gold-500/25 border border-gold-500/40 text-gold-300 text-xs font-bold flex items-center gap-1.5 transition"
+                        title="Direct TNEB Quick Pay"
                     >
-                        <span>{language === 'ta' ? 'TNPDCL கட்டண தளம்' : 'TNPDCL Online Pay'}</span>
+                        <span>{language === 'ta' ? 'TNEB உடனடி கட்டணம்' : 'TNEB Direct Quick Pay'}</span>
                         <ExternalLink size={13} />
                     </a>
                     <span className="text-xs font-mono font-bold px-3 py-1.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/30 flex items-center gap-1.5">
@@ -1055,255 +1095,413 @@ export default function AdminPortal() {
                                                 <span>{language === 'ta' ? 'மின்கட்டணத் தரவுகள் ஏற்றப்படுகின்றன...' : 'Loading central billing database...'}</span>
                                             </td>
                                         </tr>
-                                    ) : filteredBills.length === 0 ? (
+                                    ) : groupedConsumerBills.length === 0 ? (
                                         <tr>
                                             <td colSpan="8" className="text-center p-8 text-slate-400">
                                                 {language === 'ta' ? 'பொருந்தக்கூடிய விலைப்பட்டியல் தரவுகள் இல்லை.' : 'No consumer bills found matching selected filters.'}
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredBills.map((b) => {
+                                        groupedConsumerBills.map((group) => {
+                                            const b = group.recentBill;
+                                            const prevBills = group.previousBills;
+                                            const consumerKey = group.key;
+                                            const isExpanded = !!expandedConsumerHistory[consumerKey];
                                             const genDate = new Date(b.createdAt || Date.now());
                                             const dueDate = new Date(b.dueDate);
                                             const isPendingVerification = b.status === 'PENDING_VERIFICATION' || b.paymentVerificationStatus === 'PENDING';
 
                                             return (
-                                                <tr key={b._id} className={`transition ${isPendingVerification ? 'bg-cyan-500/5 hover:bg-cyan-500/10' : 'hover:bg-darker/40'}`}>
-                                                    {/* Consumer & Service No */}
-                                                    <td className="p-4">
-                                                        <p className="font-bold text-white text-sm">{b.userName}</p>
-                                                        <p className="font-mono text-xs text-gold-400 mt-0.5">{b.serviceNumber}</p>
-                                                        <p className="text-[10px] text-slate-500">{b.userEmail}</p>
-                                                    </td>
+                                                <Fragment key={consumerKey || b._id}>
+                                                    <tr className={`transition ${isPendingVerification ? 'bg-cyan-500/5 hover:bg-cyan-500/10' : 'hover:bg-darker/40'}`}>
+                                                        {/* Consumer & Service No */}
+                                                        <td className="p-4 align-top">
+                                                            <p className="font-bold text-white text-sm">{b.userName}</p>
+                                                            <p className="font-mono text-xs text-gold-400 mt-0.5">{b.serviceNumber}</p>
+                                                            <p className="text-[10px] text-slate-500">{b.userEmail}</p>
 
-                                                    {/* District & Category */}
-                                                    <td className="p-4">
-                                                        <div className="space-y-0.5">
-                                                            <span className="inline-flex items-center gap-1 font-medium text-slate-200">
-                                                                <MapPin size={12} className="text-gold-400 shrink-0" />
-                                                                <span>{formatDistrict(b.district, language)}</span>
-                                                            </span>
-                                                            <p className="text-[10px] text-slate-400">
-                                                                {formatCategory(b.connectionType, language)}
-                                                            </p>
-                                                        </div>
-                                                    </td>
-
-                                                    {/* Generation & Due Date */}
-                                                    <td className="p-4">
-                                                        <div className="space-y-1 font-mono text-[11px]">
-                                                            <div>
-                                                                <span className="text-[10px] text-slate-500 font-sans block">
-                                                                    {language === 'ta' ? 'உருவாக்கப்பட்டது:' : 'Generated:'}
-                                                                </span>
-                                                                <span className="text-slate-300 font-bold">
-                                                                    {genDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                                                </span>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-[10px] text-amber-400 font-sans block">
-                                                                    {language === 'ta' ? 'கடைசி நாள் (15 நாட்கள்):' : 'Due Date (15 Days):'}
-                                                                </span>
-                                                                <span className="text-amber-300 font-bold">
-                                                                    {dueDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-
-                                                    {/* Units & Base Bill */}
-                                                    <td className="p-4 font-mono">
-                                                        <span className="font-bold text-white text-xs">{b.unitsConsumed} kWh</span>
-                                                        <p className="text-[11px] text-slate-400 mt-0.5">₹{b.totalAmount?.toLocaleString()}</p>
-                                                    </td>
-
-                                                    {/* Fine Amount */}
-                                                    <td className="p-4 font-mono">
-                                                        {b.fineAmount > 0 ? (
-                                                            <span className="font-bold text-red-400 px-2 py-0.5 rounded bg-red-500/10 border border-red-500/30 inline-block">
-                                                                +₹{b.fineAmount}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-slate-500">₹0</span>
-                                                        )}
-                                                    </td>
-
-                                                    {/* Total Payable */}
-                                                    <td className="p-4 font-mono font-black text-gold-400 text-sm">
-                                                        ₹{b.totalPayable?.toLocaleString()}
-                                                    </td>
-
-                                                    {/* Due Date & Status Badge */}
-                                                    <td className="p-4 space-y-1">
-                                                        {b.status === 'PAID' ? (
-                                                            <div>
-                                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 font-bold text-[10px] border border-emerald-500/30">
-                                                                    <CheckCircle2 size={12} /> {language === 'ta' ? 'கட்டணம் செலுத்தப்பட்டது' : 'PAYMENT DONE'}
-                                                                </span>
-                                                                {b.paidAt && (
-                                                                    <p className="text-[9px] text-slate-500 mt-0.5">
-                                                                        {new Date(b.paidAt).toLocaleDateString()} • {b.paymentMode || 'ONLINE'}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        ) : isPendingVerification ? (
-                                                            <div className="space-y-1">
-                                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-cyan-500/15 text-cyan-400 font-bold text-[10px] border border-cyan-500/30 animate-pulse">
-                                                                    <Clock size={12} /> {language === 'ta' ? 'சரிபார்ப்பு நிலுவை' : 'VERIFICATION PENDING'}
-                                                                </span>
-                                                                {b.transactionRef && (
-                                                                    <p className="text-[10px] text-gold-400 font-mono font-bold">
-                                                                        Ref: {b.transactionRef}
-                                                                    </p>
-                                                                )}
-                                                                {b.submittedAt && (
-                                                                    <p className="text-[9px] text-slate-400">
-                                                                        {new Date(b.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} • {new Date(b.submittedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        ) : b.status === 'OVERDUE' ? (
-                                                            <div>
-                                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-500/15 text-red-400 font-bold text-[10px] border border-red-500/30">
-                                                                    <ShieldAlert size={12} /> {language === 'ta' ? 'அபராதம் / தாமதம்' : 'OVERDUE'}
-                                                                </span>
-                                                                <p className="text-[9px] text-red-400 font-bold mt-0.5">
-                                                                    +{b.daysOverdue} {language === 'ta' ? 'நாட்கள் தாமதம்' : 'days overdue'}
-                                                                </p>
-                                                            </div>
-                                                        ) : (b.isNearingDue || (b.daysRemaining >= 0 && b.daysRemaining <= 3)) ? (
-                                                            <div>
-                                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-yellow-500/15 text-yellow-400 font-bold text-[10px] border border-yellow-500/30 animate-pulse">
-                                                                    <AlertTriangle size={12} /> {language === 'ta' ? 'கடைசி நாள் நினைவூட்டல்' : 'DUE REMINDER'}
-                                                                </span>
-                                                                <p className="text-[9px] text-yellow-400 font-bold mt-0.5">
-                                                                    {b.daysRemaining} {language === 'ta' ? 'நாட்கள் உள்ளன' : 'days left'}
-                                                                </p>
-                                                            </div>
-                                                        ) : (
-                                                            <div>
-                                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-400 font-bold text-[10px] border border-amber-500/30">
-                                                                    <Clock size={12} /> {language === 'ta' ? 'நிலுவை' : 'UNPAID'}
-                                                                </span>
-                                                                <p className="text-[9px] text-slate-400 mt-0.5">
-                                                                    {b.daysRemaining} {language === 'ta' ? 'நாட்கள் உள்ளன' : 'days left'}
-                                                                </p>
-                                                            </div>
-                                                        )}
-                                                    </td>
-
-                                                    {/* Actions */}
-                                                    <td className="p-4 text-right">
-                                                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                                                            {isPendingVerification ? (
-                                                                <>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleAdminVerifyPayment(b, 'APPROVE')}
-                                                                        className="px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-darker text-xs font-black transition cursor-pointer flex items-center gap-1 shadow-sm"
-                                                                        title="Approve & Confirm Paid"
-                                                                    >
-                                                                        <Check size={12} className="stroke-[3]" />
-                                                                        <span>{language === 'ta' ? 'அங்கீகரி' : 'Approve'}</span>
-                                                                    </button>
-
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleAdminVerifyPayment(b, 'REJECT')}
-                                                                        className="px-2 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 text-xs font-bold transition cursor-pointer"
-                                                                        title="Reject Reference"
-                                                                    >
-                                                                        <span>{language === 'ta' ? 'நிராகரி' : 'Reject'}</span>
-                                                                    </button>
-                                                                </>
-                                                            ) : b.status !== 'PAID' ? (
-                                                                <>
-                                                                    {/* Action for Overdue Consumers */}
-                                                                    {b.status === 'OVERDUE' && (
-                                                                        <button
-                                                                            type="button"
-                                                                            disabled={actionLoading}
-                                                                            onClick={() => handleDirectOverdueFine(b)}
-                                                                            className="px-2.5 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 text-red-300 text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-sm"
-                                                                            title="Impose late fine & email statutory warning to consumer"
-                                                                        >
-                                                                            <ShieldAlert size={12} className="text-red-400" />
-                                                                            <span>{language === 'ta' ? 'அபராதம் & அறிவிப்பு' : 'Impose Fine & Email'}</span>
-                                                                        </button>
-                                                                    )}
-
-                                                                    {/* Action for Due Reminder Consumers */}
-                                                                    {(b.isNearingDue || (b.daysRemaining >= 0 && b.daysRemaining <= 3)) && (
-                                                                        <button
-                                                                            type="button"
-                                                                            disabled={actionLoading}
-                                                                            onClick={() => handleSendSingleReminder(b)}
-                                                                            className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-sm"
-                                                                            title="Send approaching due date reminder alert & email to consumer"
-                                                                        >
-                                                                            <Bell size={12} className="text-amber-400" />
-                                                                            <span>{language === 'ta' ? 'நினைவூட்டல் அனுப்பு' : 'Send Due Reminder'}</span>
-                                                                        </button>
-                                                                    )}
-
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleAdminVerifyPayment(b, 'APPROVE')}
-                                                                        className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition cursor-pointer flex items-center gap-1"
-                                                                        title="Verify & Mark as Paid"
-                                                                    >
-                                                                        <Check size={12} />
-                                                                        <span>{language === 'ta' ? 'உறுதி செய்' : 'Verify Paid'}</span>
-                                                                    </button>
-
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setFineModalBill(b);
-                                                                            setCustomFineAmount(b.fineAmount || 150);
-                                                                            setCustomFineReason(b.fineReason || 'TANGEDCO Late Payment Surcharge (LPSC)');
-                                                                        }}
-                                                                        className="px-2.5 py-1.5 rounded-lg bg-dark hover:bg-panel border border-panelBorder text-slate-300 hover:text-gold-400 text-xs font-semibold transition cursor-pointer"
-                                                                        title="Impose or adjust fine"
-                                                                    >
-                                                                        {language === 'ta' ? 'அபராதம்' : 'Fine'}
-                                                                    </button>
-                                                                </>
-                                                            ) : null}
-
-                                                            {/* Quick Timeline Adjuster */}
-                                                            {b.status !== 'PAID' && (
-                                                                <select
-                                                                    defaultValue=""
-                                                                    onChange={(e) => {
-                                                                        if (e.target.value) {
-                                                                            handleAdjustBillDate(b._id, e.target.value);
-                                                                            e.target.value = '';
-                                                                        }
-                                                                    }}
-                                                                    className="px-2 py-1.5 rounded-lg bg-dark hover:bg-darker border border-gold-500/30 text-gold-400 text-xs font-semibold cursor-pointer outline-none shadow-sm"
-                                                                    title={language === 'ta' ? 'கட்டணக் கால அவகாசம் மாற்றவும்' : 'Adjust billing timeline & status'}
+                                                            {/* Interactive Down Arrow / History Toggle Button */}
+                                                            {prevBills.length > 0 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => toggleConsumerHistory(consumerKey)}
+                                                                    className={`mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer shadow-sm ${
+                                                                        isExpanded
+                                                                            ? 'bg-amber-500/25 border-amber-500/50 text-amber-200 shadow-amber-500/10'
+                                                                            : 'bg-dark hover:bg-darker border-gold-500/30 text-amber-300 hover:text-amber-200'
+                                                                    }`}
+                                                                    title={isExpanded ? (language === 'ta' ? 'முந்தைய வரலாற்றை மறைக்கவும்' : 'Hide previous billing history') : (language === 'ta' ? 'முந்தைய வரலாறு பார்க்கவும்' : 'View previous billing history')}
                                                                 >
-                                                                    <option value="" disabled>{language === 'ta' ? 'கால அவகாசம்' : '⚡ Timeline'}</option>
-                                                                    <option value="OVERDUE">⚠️ {language === 'ta' ? 'அபராதம் / தாமதம் (-5 நாட்கள்)' : 'Statutory Overdue (-5d + Fine)'}</option>
-                                                                    <option value="NEARING_DUE">⏰ {language === 'ta' ? 'கடைசி நாள் நினைவூட்டல் (+2 நாட்கள்)' : 'Due in 2 Days'}</option>
-                                                                    <option value="PENDING_VERIFICATION">📝 {language === 'ta' ? 'சரிபார்ப்பு நிலுவைக்கு மாற்று' : 'Pending Verification Queue'}</option>
-                                                                    <option value="NORMAL">✅ {language === 'ta' ? 'இயல்பு நிலை (15 நாட்கள்)' : 'Standard Cycle (15d)'}</option>
-                                                                </select>
+                                                                    <span>{language === 'ta' ? 'முந்தைய வரலாறு' : 'Previous History'} ({prevBills.length})</span>
+                                                                    <ChevronDown size={13} className={`transition-transform duration-200 ${isExpanded ? 'rotate-180 text-amber-400' : 'text-amber-400'}`} />
+                                                                </button>
                                                             )}
+                                                        </td>
 
-                                                            <a
-                                                                href="https://www.tnebnet.org/awp/login"
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="p-1.5 rounded-lg bg-dark hover:bg-panel border border-panelBorder text-slate-400 hover:text-white transition cursor-pointer"
-                                                                title="TANGEDCO Portal"
-                                                            >
-                                                                <ExternalLink size={14} />
-                                                            </a>
-                                                        </div>
-                                                    </td>
-                                                </tr>
+                                                        {/* District & Category */}
+                                                        <td className="p-4 align-top">
+                                                            <div className="space-y-0.5">
+                                                                <span className="inline-flex items-center gap-1 font-medium text-slate-200">
+                                                                    <MapPin size={12} className="text-gold-400 shrink-0" />
+                                                                    <span>{formatDistrict(b.district, language)}</span>
+                                                                </span>
+                                                                <p className="text-[10px] text-slate-400">
+                                                                    {formatCategory(b.connectionType, language)}
+                                                                </p>
+                                                            </div>
+                                                        </td>
+
+                                                        {/* Generation & Due Date */}
+                                                        <td className="p-4 align-top">
+                                                            <div className="space-y-1 font-mono text-[11px]">
+                                                                <div>
+                                                                    <span className="text-[10px] text-slate-500 font-sans block">
+                                                                        {language === 'ta' ? 'உருவாக்கப்பட்டது:' : 'Generated:'}
+                                                                    </span>
+                                                                    <span className="text-slate-300 font-bold">
+                                                                        {genDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                                    </span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-[10px] text-amber-400 font-sans block">
+                                                                        {language === 'ta' ? 'கடைசி நாள் (15 நாட்கள்):' : 'Due Date (15 Days):'}
+                                                                    </span>
+                                                                    <span className="text-amber-300 font-bold">
+                                                                        {dueDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+
+                                                        {/* Units & Base Bill */}
+                                                        <td className="p-4 align-top font-mono">
+                                                            <span className="font-bold text-white text-xs">{b.unitsConsumed} kWh</span>
+                                                            <p className="text-[11px] text-slate-400 mt-0.5">₹{b.totalAmount?.toLocaleString()}</p>
+                                                        </td>
+
+                                                        {/* Fine Amount */}
+                                                        <td className="p-4 align-top font-mono">
+                                                            {b.fineAmount > 0 ? (
+                                                                <span className="font-bold text-red-400 px-2 py-0.5 rounded bg-red-500/10 border border-red-500/30 inline-block">
+                                                                    +₹{b.fineAmount}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-slate-500">₹0</span>
+                                                            )}
+                                                        </td>
+
+                                                        {/* Total Payable */}
+                                                        <td className="p-4 align-top font-mono font-black text-gold-400 text-sm">
+                                                            ₹{b.totalPayable?.toLocaleString()}
+                                                        </td>
+
+                                                        {/* Due Date & Status Badge */}
+                                                        <td className="p-4 align-top space-y-1">
+                                                            {b.status === 'PAID' ? (
+                                                                <div>
+                                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 font-bold text-[10px] border border-emerald-500/30">
+                                                                        <CheckCircle2 size={12} /> {language === 'ta' ? 'கட்டணம் செலுத்தப்பட்டது' : 'PAYMENT DONE'}
+                                                                    </span>
+                                                                    {b.paidAt && (
+                                                                        <p className="text-[9px] text-slate-500 mt-0.5">
+                                                                            {new Date(b.paidAt).toLocaleDateString()} • {b.paymentMode || 'ONLINE'}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            ) : isPendingVerification ? (
+                                                                <div className="space-y-1">
+                                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-cyan-500/15 text-cyan-400 font-bold text-[10px] border border-cyan-500/30 animate-pulse">
+                                                                        <Clock size={12} /> {language === 'ta' ? 'சரிபார்ப்பு நிலுவை' : 'VERIFICATION PENDING'}
+                                                                    </span>
+                                                                    {b.transactionRef && (
+                                                                        <p className="text-[10px] text-gold-400 font-mono font-bold">
+                                                                            Ref: {b.transactionRef}
+                                                                        </p>
+                                                                    )}
+                                                                    {b.submittedAt && (
+                                                                        <p className="text-[9px] text-slate-400">
+                                                                            {new Date(b.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} • {new Date(b.submittedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            ) : b.status === 'OVERDUE' ? (
+                                                                <div>
+                                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-500/15 text-red-400 font-bold text-[10px] border border-red-500/30">
+                                                                        <ShieldAlert size={12} /> {language === 'ta' ? 'அபராதம் / தாமதம்' : 'OVERDUE'}
+                                                                    </span>
+                                                                    <p className="text-[9px] text-red-400 font-bold mt-0.5">
+                                                                        +{b.daysOverdue} {language === 'ta' ? 'நாட்கள் தாமதம்' : 'days overdue'}
+                                                                    </p>
+                                                                </div>
+                                                            ) : (b.isNearingDue || (b.daysRemaining >= 0 && b.daysRemaining <= 3)) ? (
+                                                                <div>
+                                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-yellow-500/15 text-yellow-400 font-bold text-[10px] border border-yellow-500/30 animate-pulse">
+                                                                        <AlertTriangle size={12} /> {language === 'ta' ? 'கடைசி நாள் நினைவூட்டல்' : 'DUE REMINDER'}
+                                                                    </span>
+                                                                    <p className="text-[9px] text-yellow-400 font-bold mt-0.5">
+                                                                        {b.daysRemaining} {language === 'ta' ? 'நாட்கள் உள்ளன' : 'days left'}
+                                                                    </p>
+                                                                </div>
+                                                            ) : (
+                                                                <div>
+                                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-400 font-bold text-[10px] border border-amber-500/30">
+                                                                        <Clock size={12} /> {language === 'ta' ? 'நிலுவை' : 'UNPAID'}
+                                                                    </span>
+                                                                    <p className="text-[9px] text-slate-400 mt-0.5">
+                                                                        {b.daysRemaining} {language === 'ta' ? 'நாட்கள் உள்ளன' : 'days left'}
+                                                                    </p>
+                                                                </div>
+                                                            )}
+                                                        </td>
+
+                                                        {/* Actions */}
+                                                        <td className="p-4 align-top text-right">
+                                                            <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                                                {isPendingVerification ? (
+                                                                    <>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleAdminVerifyPayment(b, 'APPROVE')}
+                                                                            className="px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-darker text-xs font-black transition cursor-pointer flex items-center gap-1 shadow-sm"
+                                                                            title="Approve & Confirm Paid"
+                                                                        >
+                                                                            <Check size={12} className="stroke-[3]" />
+                                                                            <span>{language === 'ta' ? 'அங்கீகரி' : 'Approve'}</span>
+                                                                        </button>
+
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleAdminVerifyPayment(b, 'REJECT')}
+                                                                            className="px-2 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 text-xs font-bold transition cursor-pointer"
+                                                                            title="Reject Reference"
+                                                                        >
+                                                                            <span>{language === 'ta' ? 'நிராகரி' : 'Reject'}</span>
+                                                                        </button>
+                                                                    </>
+                                                                ) : b.status !== 'PAID' ? (
+                                                                    <>
+                                                                        {/* Action for Overdue Consumers */}
+                                                                        {b.status === 'OVERDUE' && (
+                                                                            <button
+                                                                                type="button"
+                                                                                disabled={actionLoading}
+                                                                                onClick={() => handleDirectOverdueFine(b)}
+                                                                                className="px-2.5 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 text-red-300 text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-sm"
+                                                                                title="Impose late fine & email statutory warning to consumer"
+                                                                            >
+                                                                                <ShieldAlert size={12} className="text-red-400" />
+                                                                                <span>{language === 'ta' ? 'அபராதம் & அறிவிப்பு' : 'Impose Fine & Email'}</span>
+                                                                            </button>
+                                                                        )}
+
+                                                                        {/* Action for Due Reminder Consumers */}
+                                                                        {(b.isNearingDue || (b.daysRemaining >= 0 && b.daysRemaining <= 3)) && (
+                                                                            <button
+                                                                                type="button"
+                                                                                disabled={actionLoading}
+                                                                                onClick={() => handleSendSingleReminder(b)}
+                                                                                className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-sm"
+                                                                                title="Send approaching due date reminder alert & email to consumer"
+                                                                            >
+                                                                                <Bell size={12} className="text-amber-400" />
+                                                                                <span>{language === 'ta' ? 'நினைவூட்டல் அனுப்பு' : 'Send Due Reminder'}</span>
+                                                                            </button>
+                                                                        )}
+
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleAdminVerifyPayment(b, 'APPROVE')}
+                                                                            className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                                                                            title="Verify & Mark as Paid"
+                                                                        >
+                                                                            <Check size={12} />
+                                                                            <span>{language === 'ta' ? 'உறுதி செய்' : 'Verify Paid'}</span>
+                                                                        </button>
+
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setFineModalBill(b);
+                                                                                setCustomFineAmount(b.fineAmount || 150);
+                                                                                setCustomFineReason(b.fineReason || 'TANGEDCO Late Payment Surcharge (LPSC)');
+                                                                            }}
+                                                                            className="px-2.5 py-1.5 rounded-lg bg-dark hover:bg-panel border border-panelBorder text-slate-300 hover:text-gold-400 text-xs font-semibold transition cursor-pointer"
+                                                                            title="Impose or adjust fine"
+                                                                        >
+                                                                            {language === 'ta' ? 'அபராதம்' : 'Fine'}
+                                                                        </button>
+                                                                    </>
+                                                                ) : null}
+
+                                                                {/* Quick Timeline Adjuster */}
+                                                                {b.status !== 'PAID' && (
+                                                                    <select
+                                                                        defaultValue=""
+                                                                        onChange={(e) => {
+                                                                            if (e.target.value) {
+                                                                                handleAdjustBillDate(b._id, e.target.value);
+                                                                                e.target.value = '';
+                                                                            }
+                                                                        }}
+                                                                        className="px-2 py-1.5 rounded-lg bg-dark hover:bg-darker border border-gold-500/30 text-gold-400 text-xs font-semibold cursor-pointer outline-none shadow-sm"
+                                                                        title={language === 'ta' ? 'கட்டணக் கால அவகாசம் மாற்றவும்' : 'Adjust billing timeline & status'}
+                                                                    >
+                                                                        <option value="" disabled>{language === 'ta' ? 'கால அவகாசம்' : '⚡ Timeline'}</option>
+                                                                        <option value="OVERDUE">⚠️ {language === 'ta' ? 'அபராதம் / தாமதம் (-5 நாட்கள்)' : 'Statutory Overdue (-5d + Fine)'}</option>
+                                                                        <option value="NEARING_DUE">⏰ {language === 'ta' ? 'கடைசி நாள் நினைவூட்டல் (+2 நாட்கள்)' : 'Due in 2 Days'}</option>
+                                                                        <option value="PENDING_VERIFICATION">📝 {language === 'ta' ? 'சரிபார்ப்பு நிலுவைக்கு மாற்று' : 'Pending Verification Queue'}</option>
+                                                                        <option value="NORMAL">✅ {language === 'ta' ? 'இயல்பு நிலை (15 நாட்கள்)' : 'Standard Cycle (15d)'}</option>
+                                                                    </select>
+                                                                )}
+
+                                                                <a
+                                                                    href="https://www.tnebnet.org/qpay/"
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="p-1.5 rounded-lg bg-dark hover:bg-panel border border-panelBorder text-slate-400 hover:text-white transition cursor-pointer"
+                                                                    title="Direct TNEB Quick Pay"
+                                                                >
+                                                                    <ExternalLink size={14} />
+                                                                </a>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+
+                                                    {/* Sub-rows: Previous Billing History when expanded */}
+                                                    {isExpanded && prevBills.map((prev, pIdx) => {
+                                                        const prevGenDate = new Date(prev.createdAt || Date.now());
+                                                        const prevDueDate = new Date(prev.dueDate);
+                                                        const prevIsPending = prev.status === 'PENDING_VERIFICATION' || prev.paymentVerificationStatus === 'PENDING';
+
+                                                        return (
+                                                            <tr key={prev._id || `${consumerKey}-prev-${pIdx}`} className="bg-darker/80 border-l-4 border-l-amber-500/70 hover:bg-darker/95 transition text-slate-300">
+                                                                {/* Past Record Identifier */}
+                                                                <td className="p-4 pl-6 align-top">
+                                                                    <div className="flex items-start gap-2">
+                                                                        <CornerDownRight size={14} className="text-amber-400 shrink-0 mt-0.5" />
+                                                                        <div>
+                                                                            <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold inline-block">
+                                                                                {language === 'ta' ? 'முந்தைய பில்' : 'Past Bill'} #{prevBills.length - pIdx}
+                                                                            </span>
+                                                                            <p className="text-[10px] text-slate-400 font-mono mt-1 font-semibold">{prev.billingMonth || 'Prior Cycle'}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+
+                                                                {/* District & Category */}
+                                                                <td className="p-4 align-top">
+                                                                    <div className="space-y-0.5">
+                                                                        <span className="inline-flex items-center gap-1 font-medium text-slate-300">
+                                                                            <MapPin size={11} className="text-amber-400/70 shrink-0" />
+                                                                            <span>{formatDistrict(prev.district, language)}</span>
+                                                                        </span>
+                                                                        <p className="text-[10px] text-slate-400">{formatCategory(prev.connectionType, language)}</p>
+                                                                    </div>
+                                                                </td>
+
+                                                                {/* Generation & Due Date */}
+                                                                <td className="p-4 align-top">
+                                                                    <div className="space-y-1 font-mono text-[11px]">
+                                                                        <div>
+                                                                            <span className="text-[10px] text-slate-500 font-sans block">{language === 'ta' ? 'உருவாக்கப்பட்டது:' : 'Generated:'}</span>
+                                                                            <span className="text-slate-300 font-medium">
+                                                                                {prevGenDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div>
+                                                                            <span className="text-[10px] text-slate-500 font-sans block">{language === 'ta' ? 'கடைசி நாள்:' : 'Due Date:'}</span>
+                                                                            <span className="text-slate-400">
+                                                                                {prevDueDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+
+                                                                {/* Units & Base Bill */}
+                                                                <td className="p-4 align-top font-mono">
+                                                                    <span className="font-semibold text-slate-200 text-xs">{prev.unitsConsumed} kWh</span>
+                                                                    <p className="text-[11px] text-slate-400 mt-0.5">₹{prev.totalAmount?.toLocaleString()}</p>
+                                                                </td>
+
+                                                                {/* Fine Amount */}
+                                                                <td className="p-4 align-top font-mono">
+                                                                    {prev.fineAmount > 0 ? (
+                                                                        <span className="font-bold text-red-400 px-2 py-0.5 rounded bg-red-500/10 border border-red-500/30 inline-block text-[11px]">
+                                                                            +₹{prev.fineAmount}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-slate-500">₹0</span>
+                                                                    )}
+                                                                </td>
+
+                                                                {/* Total Payable */}
+                                                                <td className="p-4 align-top font-mono font-bold text-amber-300 text-sm">
+                                                                    ₹{prev.totalPayable?.toLocaleString()}
+                                                                </td>
+
+                                                                {/* Status Badge */}
+                                                                <td className="p-4 align-top space-y-1">
+                                                                    {prev.status === 'PAID' ? (
+                                                                        <div>
+                                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold text-[9px] border border-emerald-500/30">
+                                                                                <CheckCircle2 size={11} /> {language === 'ta' ? 'செலுத்தப்பட்டது' : 'PAID'}
+                                                                            </span>
+                                                                            {prev.paidAt && (
+                                                                                <p className="text-[9px] text-slate-500 mt-0.5">
+                                                                                    {new Date(prev.paidAt).toLocaleDateString()} • {prev.paymentMode || 'ONLINE'}
+                                                                                </p>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : prevIsPending ? (
+                                                                        <div>
+                                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 font-bold text-[9px] border border-cyan-500/30">
+                                                                                <Clock size={11} /> {language === 'ta' ? 'சரிபார்ப்பு நிலுவை' : 'VERIFICATION PENDING'}
+                                                                            </span>
+                                                                        </div>
+                                                                    ) : prev.status === 'OVERDUE' ? (
+                                                                        <div>
+                                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 font-bold text-[9px] border border-red-500/30">
+                                                                                <ShieldAlert size={11} /> {language === 'ta' ? 'தாமதம்' : 'OVERDUE'}
+                                                                            </span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div>
+                                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-bold text-[9px] border border-amber-500/30">
+                                                                                <Clock size={11} /> {language === 'ta' ? 'நிலுவை' : 'UNPAID'}
+                                                                            </span>
+                                                                        </div>
+                                                                    )}
+                                                                </td>
+
+                                                                {/* Actions for Previous Bill */}
+                                                                <td className="p-4 align-top text-right">
+                                                                    <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                                                        {prev.status !== 'PAID' && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleAdminVerifyPayment(prev, 'APPROVE')}
+                                                                                className="px-2 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold transition cursor-pointer flex items-center gap-1"
+                                                                                title="Verify & Mark as Paid"
+                                                                            >
+                                                                                <Check size={11} />
+                                                                                <span>{language === 'ta' ? 'உறுதி செய்' : 'Verify Paid'}</span>
+                                                                            </button>
+                                                                        )}
+                                                                        <a
+                                                                            href="https://www.tnebnet.org/qpay/"
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className="p-1 rounded bg-dark hover:bg-panel border border-panelBorder text-slate-400 hover:text-white transition cursor-pointer"
+                                                                            title="Direct TNEB Quick Pay"
+                                                                        >
+                                                                            <ExternalLink size={13} />
+                                                                        </a>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </Fragment>
                                             );
                                         })
                                     )}
