@@ -13,13 +13,16 @@ const alertSchema = new mongoose.Schema({
             'FINE_IMPOSED',
             'PAYMENT_SUCCESS',
             'INVOICE_GENERATED',
-            'KYC_STATUS'
+            'KYC_STATUS',
+            'PAYMENT_VERIFICATION_REQUEST',
+            'ADMIN_ALERT'
         ], 
         required: true 
     },
     title: { type: String, default: '' },
     titleTa: { type: String, default: '' },
     severity: { type: String, enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'], default: 'MEDIUM' },
+    targetRole: { type: String, enum: ['CONSUMER', 'ADMIN', 'ALL'], default: 'CONSUMER' },
     message: { type: String, required: true },
     messageTa: { type: String, default: '' },
     consumer: { type: mongoose.Schema.Types.ObjectId, ref: 'Consumer' },

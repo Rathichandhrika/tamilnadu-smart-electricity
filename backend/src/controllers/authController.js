@@ -507,11 +507,11 @@ const uploadKycDocument = async (req, res) => {
                 await Alert.create({
                     type: 'KYC_STATUS',
                     severity: 'HIGH',
+                    targetRole: 'ADMIN',
                     title: `e-KYC Document Uploaded: ${user.name}`,
                     titleTa: `புதிய e-KYC ஆவணம் பதிவேற்றப்பட்டது: ${user.name}`,
                     message: `Consumer ${user.name} (Service No: ${serviceNo}, District: ${consumer?.district || user.district || 'Tamil Nadu'}) uploaded a new ${docTypeLabel} for accreditation. Please verify in the e-KYC tab.`,
                     messageTa: `நுகர்வோர் ${user.name} (இணைப்பு எண்: ${serviceNo}, மாவட்டம்: ${consumer?.district || user.district || 'தமிழ்நாடு'}) தனது அங்கீகாரத்திற்காக ${docTypeLabelTa} ஆவணத்தை சமர்ப்பித்துள்ளார். தயவுசெய்து e-KYC பகுதியில் சரிபார்க்கவும்.`,
-                    consumer: consumer?._id,
                     user: admin._id,
                     isResolved: false
                 });

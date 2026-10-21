@@ -1081,7 +1081,9 @@ const getAdminNotifications = async (req, res, next) => {
         const alerts = await Alert.find({
             $or: [
                 { user: req.user._id },
+                { targetRole: 'ADMIN' },
                 { type: 'KYC_STATUS' },
+                { type: 'PAYMENT_VERIFICATION_REQUEST' },
                 { severity: 'HIGH' }
             ]
         })

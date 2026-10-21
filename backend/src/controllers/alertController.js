@@ -6,12 +6,32 @@ const Consumer = require('../models/Consumer');
 // @access  Private
 const getActiveAlerts = async (req, res, next) => {
     try {
-        const consumer = await Consumer.findOne({ user: req.user._id });
-        const userCondition = [{ user: req.user._id }];
-        if (consumer) {
-            userCondition.push({ consumer: consumer._id });
+        const isConsumer = req.user.role === 'CONSUMER';
+        let filter;
+
+        if (isConsumer) {
+            // Consumers ONLY see alerts explicitly meant for consumers (never admin KYC verification requests)
+            const consumer = await Consumer.findOne({ user: req.user._id });
+            const userCondition = [{ user: req.user._id }];
+            if (consumer) {
+                userCondition.push({ consumer: consumer._id });
+            }
+            filter = {
+                $or: userCondition,
+                targetRole: { $ne: 'ADMIN' },
+                type: { $nin: ['KYC_STATUS', 'PAYMENT_VERIFICATION_REQUEST', 'ADMIN_ALERT'] }
+            };
+        } else {
+            // Admins see their alerts or admin-targeted broadcasts
+            filter = {
+                $or: [
+                    { user: req.user._id },
+                    { targetRole: 'ADMIN' },
+                    { type: 'KYC_STATUS' },
+                    { type: 'PAYMENT_VERIFICATION_REQUEST' }
+                ]
+            };
         }
-        const filter = { $or: userCondition };
 
         const alerts = await Alert.find(filter)
             .populate('bill')
@@ -36,12 +56,32 @@ const getActiveAlerts = async (req, res, next) => {
 // @access  Private
 const getUnreadAlertsCount = async (req, res, next) => {
     try {
-        const consumer = await Consumer.findOne({ user: req.user._id });
-        const userCondition = [{ user: req.user._id }];
-        if (consumer) {
-            userCondition.push({ consumer: consumer._id });
+        const isConsumer = req.user.role === 'CONSUMER';
+        let filter;
+
+        if (isConsumer) {
+            const consumer = await Consumer.findOne({ user: req.user._id });
+            const userCondition = [{ user: req.user._id }];
+            if (consumer) {
+                userCondition.push({ consumer: consumer._id });
+            }
+            filter = {
+                isResolved: { $ne: true },
+                $or: userCondition,
+                targetRole: { $ne: 'ADMIN' },
+                type: { $nin: ['KYC_STATUS', 'PAYMENT_VERIFICATION_REQUEST', 'ADMIN_ALERT'] }
+            };
+        } else {
+            filter = {
+                isResolved: { $ne: true },
+                $or: [
+                    { user: req.user._id },
+                    { targetRole: 'ADMIN' },
+                    { type: 'KYC_STATUS' },
+                    { type: 'PAYMENT_VERIFICATION_REQUEST' }
+                ]
+            };
         }
-        const filter = { isResolved: { $ne: true }, $or: userCondition };
 
         const count = await Alert.countDocuments(filter);
         res.status(200).json({ success: true, count });
