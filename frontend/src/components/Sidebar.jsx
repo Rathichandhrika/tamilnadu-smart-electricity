@@ -17,8 +17,12 @@ export default function Sidebar({ isOpen, close }) {
     const [unreadCount, setUnreadCount] = useState(0);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
-    const adminEmails = ['admin@smarttn.gov', 'chandhrikarathi09@gmail.com'];
-    const isAdmin = Boolean(user && (user.role === 'ADMIN' || (user.email && adminEmails.includes(user.email.toLowerCase()))));
+    const adminEmails = ['admin@smarttn.gov'];
+    const isAdmin = Boolean(
+        user &&
+        user.email?.toLowerCase().trim() !== 'chandhrikarathi09@gmail.com' &&
+        (user.role === 'ADMIN' || adminEmails.includes(user.email?.toLowerCase().trim()))
+    );
     const searchParams = new URLSearchParams(location.search);
     const currentTab = searchParams.get('tab') || 'BILLING';
 

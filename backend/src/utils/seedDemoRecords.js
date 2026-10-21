@@ -54,6 +54,7 @@ async function seedDemo() {
             rathiConsumer.kycDocuments = [kycDoc];
             await rathiConsumer.save();
 
+            rathiUser.role = 'CONSUMER';
             rathiUser.verificationStatus = 'PENDING';
             rathiUser.kycDocuments = [kycDoc];
             await rathiUser.save();

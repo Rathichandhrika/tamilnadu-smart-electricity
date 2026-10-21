@@ -141,7 +141,8 @@ export default function AuthPage() {
             const result = await login(trimmedEmail, loginData.password);
 
             if (result && result.success) {
-                const targetPath = result.user?.role === 'ADMIN' || loginRole === 'ADMIN' ? '/admin' : '/dashboard';
+                const isAdmin = result.user?.email?.toLowerCase().trim() === 'admin@smarttn.gov' || (result.user?.role === 'ADMIN' && result.user?.email?.toLowerCase().trim() !== 'chandhrikarathi09@gmail.com');
+                const targetPath = isAdmin ? '/admin' : '/dashboard';
                 navigate(targetPath, { replace: true });
             } else {
                 setError(result?.message || 'Invalid email or password. Please try again.');

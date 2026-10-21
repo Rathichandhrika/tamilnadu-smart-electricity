@@ -26,16 +26,15 @@ const protect = async (req, res, next) => {
             return res.status(401).json({ success: false, message: 'Not authorized, user no longer exists' });
         }
 
-        const adminEmails = [
-            'admin@smarttn.gov',
-            'chandhrikarathi09@gmail.com',
-            process.env.ADMIN_NOTIFICATION_EMAIL,
-            process.env.SMTP_USER,
-            process.env.EMAIL_USER
-        ].filter(Boolean).map(e => e.toLowerCase().trim());
+        const adminEmails = ['admin@smarttn.gov'];
 
-        if (req.user.email && adminEmails.includes(req.user.email.toLowerCase().trim())) {
-            req.user.role = 'ADMIN';
+        if (req.user && req.user.email) {
+            const emailNorm = req.user.email.toLowerCase().trim();
+            if (emailNorm === 'chandhrikarathi09@gmail.com') {
+                req.user.role = 'CONSUMER';
+            } else if (adminEmails.includes(emailNorm)) {
+                req.user.role = 'ADMIN';
+            }
         }
 
         next();
@@ -45,16 +44,15 @@ const protect = async (req, res, next) => {
 };
 
 const admin = (req, res, next) => {
-    const adminEmails = [
-        'admin@smarttn.gov',
-        'chandhrikarathi09@gmail.com',
-        process.env.ADMIN_NOTIFICATION_EMAIL,
-        process.env.SMTP_USER,
-        process.env.EMAIL_USER
-    ].filter(Boolean).map(e => e.toLowerCase().trim());
+    const adminEmails = ['admin@smarttn.gov'];
+    const emailNorm = req.user && req.user.email ? req.user.email.toLowerCase().trim() : '';
+
+    if (emailNorm === 'chandhrikarathi09@gmail.com') {
+        return res.status(403).json({ success: false, message: 'Not authorized as an admin' });
+    }
 
     const isExplicitAdmin = req.user && req.user.role === 'ADMIN';
-    const isOwnerEmail = req.user && req.user.email && adminEmails.includes(req.user.email.toLowerCase().trim());
+    const isOwnerEmail = adminEmails.includes(emailNorm);
 
     if (isExplicitAdmin || isOwnerEmail) {
         if (req.user && req.user.role !== 'ADMIN') {

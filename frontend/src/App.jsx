@@ -16,8 +16,13 @@ import Payment from './pages/Payment';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminPortal from './pages/AdminPortal';
 
-const adminEmails = ['admin@smarttn.gov', 'chandhrikarathi09@gmail.com'];
-const isUserAdmin = (u) => Boolean(u && (u.role === 'ADMIN' || (u.email && adminEmails.includes(u.email.toLowerCase()))));
+const adminEmails = ['admin@smarttn.gov'];
+const isUserAdmin = (u) => {
+    if (!u) return false;
+    const email = u.email ? u.email.toLowerCase().trim() : '';
+    if (email === 'chandhrikarathi09@gmail.com') return false;
+    return u.role === 'ADMIN' || adminEmails.includes(email);
+};
 
 // Loading Spinner Component
 const FullScreenLoader = () => (
